@@ -15,22 +15,25 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="local.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="main.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="server.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
+    <ClInclude Include="sslsetting.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="abstractproxysession.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="basic.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="iohelper.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="local.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="server.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
+    <ClCompile Include="basic.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="sslsetting.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>
