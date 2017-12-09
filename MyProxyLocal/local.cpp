@@ -62,21 +62,21 @@ namespace MyProxy {
 			nextRead(); //maybe change position?
 		}
 
-		Proxy::Proxy(boost::asio::io_service &io): m_work(io), m_resolver(io)
+		Local::Local(boost::asio::io_service &io): m_work(io), m_resolver(io)
 		{
 			m_ctx.set_verify_mode(m_ctx.verify_none);
 		}
-		Proxy::~Proxy()
+		Local::~Local()
 		{
 			spdlog::drop("Local");
 		}
-		void Proxy::setServer(std::string host, std::string port)
+		void Local::setServer(std::string host, std::string port)
 		{
 			m_serverHost = host;
 			m_serverPort = port;
 		}
 
-		void Proxy::bind(std::string port, std::string bindAddress)
+		void Local::bind(std::string port, std::string bindAddress)
 		{
 			ip::tcp::endpoint bindEp;
 			if (bindAddress.size() == 0) {
@@ -90,7 +90,7 @@ namespace MyProxy {
 			m_tcpAcceptor.reset(new ip::tcp::acceptor(m_work.get_io_service(), bindEp));
 		}
 
-		void Proxy::start()
+		void Local::start()
 		{
 			auto tunnel = std::make_shared<LocalProxyTunnel>(m_work.get_io_service(), m_ctx);
 			tunnel->onDisconnected = [this] {
@@ -120,13 +120,13 @@ namespace MyProxy {
 					std::unique_lock<std::shared_mutex> locker(tunnelMutex);
 					m_tunnel = tunnel;
 					m_tunnel->start();
-					m_tunnel->onReady = std::bind(&Proxy::startAccept, this);
+					m_tunnel->onReady = std::bind(&Local::startAccept, this);
 					//startAccept();
 				});
 			});
 		}
 
-		void Proxy::startAccept()
+		void Local::startAccept()
 		{
 			auto session = std::make_shared<LocalProxySession<ip::tcp>>(newSessionId(), m_work.get_io_service());
 			m_tcpAcceptor->async_accept(session->socket(), [this, session = session](const boost::system::error_code &ec) {
@@ -147,7 +147,7 @@ namespace MyProxy {
 			});
 		}
 
-		SessionId Proxy::newSessionId()
+		SessionId Local::newSessionId()
 		{
 			return m_maxSessionId++;
 		}

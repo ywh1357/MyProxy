@@ -223,10 +223,10 @@ namespace MyProxy {
 			}
 		}
 
-		class Proxy {
+		class Local {
 		public:
-			Proxy(boost::asio::io_service &io);
-			~Proxy();
+			Local(boost::asio::io_service &io);
+			~Local();
 			void setServer(std::string host, std::string port);
 			void bind(std::string port, std::string bindAddress = std::string());
 			void start();

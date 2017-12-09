@@ -18,7 +18,7 @@ int main() {
 
 	boost::asio::io_service io;
 
-	MyProxy::Local::Proxy local(io);
+	MyProxy::Local::Local local(io);
 	local.bind("1083");
 	local.setServer("localhost", "1084");
 	local.start();
