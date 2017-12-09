@@ -27,6 +27,9 @@
     <ClCompile Include="server.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="sslsetting.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="local.h">
@@ -42,6 +45,9 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="abstractproxysession.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="sslsetting.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

@@ -128,6 +128,7 @@
     <ClCompile Include="local.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="server.cpp" />
+    <ClCompile Include="sslsetting.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="basic.h" />
@@ -135,6 +136,7 @@
     <ClInclude Include="local.h" />
     <ClInclude Include="abstractproxysession.h" />
     <ClInclude Include="server.h" />
+    <ClInclude Include="sslsetting.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

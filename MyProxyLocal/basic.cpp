@@ -124,7 +124,7 @@ namespace MyProxy {
 		if (_running.load()) {
 			disconnect();
 		}
-		m_logger->debug("destroyed");
+		m_logger->warn("destroyed");
 	}
 	void BasicProxyTunnel::write(std::shared_ptr<DataVec> dataPtr)
 	{
