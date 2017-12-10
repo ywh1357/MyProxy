@@ -128,10 +128,6 @@ namespace MyProxy {
 		static T parseType(size_t size) {
 			return T();
 		}
-		template <>
-		static DataVec parseType<DataVec>(size_t size) {
-			return DataVec(size);
-		}
 		template <typename T>
 		typename TnS<T>::type getSomeValue(TnS<T> tns) {
 			typename TnS<T>::type value = parseType<typename TnS<T>::type>(tns.size);
@@ -160,12 +156,6 @@ namespace MyProxy {
 		}
 	}
 
-	template<>
-	inline void IoHelper::write<std::vector<char>>(const std::vector<char> & value, size_t)
-	{
-		ios.write(value.data(), value.size());
-	}
-
 	template<typename T>
 	inline void IoHelper::read(T & value, size_t bytes)
 	{
@@ -175,23 +165,10 @@ namespace MyProxy {
 		}
 	}
 
-	template<>
-	inline void IoHelper::read(std::vector<char> & value, size_t bytes)
-	{
-		ios.read(value.data(), value.size());
-	}
-
 	template<typename T>
 	inline T IoHelper::getValue(size_t count)
 	{
 		T value;
-		read(value);
-		return value;
-	}
-
-	template <>
-	inline std::vector<char> IoHelper::getValue<std::vector<char>>(size_t count) {
-		std::vector<char> value(count);
 		read(value);
 		return value;
 	}
@@ -235,6 +212,15 @@ namespace MyProxy {
 			}(args), 0)...
 		};
 	}
+
+	template <>
+	static DataVec IoHelper::parseType<DataVec>(size_t size);
+	template<>
+	void IoHelper::write<std::vector<char>>(const std::vector<char> & value, size_t);
+	template<>
+	void IoHelper::read<std::vector<char>>(std::vector<char> & value, size_t bytes);
+	template <>
+	std::vector<char> IoHelper::getValue<std::vector<char>>(size_t count);
 
 	template<typename ...Args>
 	IoHelper & operator<<(IoHelper & os, const std::tuple<Args...>& tuple)
