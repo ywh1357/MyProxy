@@ -114,9 +114,11 @@ namespace MyProxy {
 	template<typename Protocol>
 	inline void AbstractProxySession<Protocol>::write(std::shared_ptr<DataVec> dataPtr)
 	{
+		//logger()->trace("AbstractProxySession<Protocol>::write() {} bytes write method posted", dataPtr->size());
 		m_writeStrand.post([this, dataPtr = std::move(dataPtr), self = shared_from_this()]{
 			if (!_running.load())
 				return;
+			//logger()->trace("AbstractProxySession<Protocol>::write() -> Lambda: {} bytes push to m_writeQueue", dataPtr->size());
 			m_writeQueue.push(std::move(dataPtr));
 			if (m_writeQueue.size() > 1) {
 				return;
@@ -131,12 +133,11 @@ namespace MyProxy {
 	template<>
 	inline void AbstractProxySession<boost::asio::ip::tcp>::write_impl()
 	{
-		static size_t missCount = 0;
 		if (m_writeQueue.empty()) {
-			logger()->debug("AbstractProxySession<boost::asio::ip::tcp>::write_impl() missCount {}", missCount);
+			//logger()->trace("AbstractProxySession<boost::asio::ip::tcp>::write_impl() m_writeQueue empty");
 			return;
 		}
-		//auto DataPtr = m_writeQueue.front();
+		//logger()->trace("AbstractProxySession<boost::asio::ip::tcp>::write_impl() {} bytes write method start async_write", m_writeQueue.front()->size());
 		async_write(m_socket, boost::asio::buffer(*m_writeQueue.front()), boost::asio::transfer_all(),
 			m_writeStrand.wrap(std::bind(&MyProxy::AbstractProxySession<boost::asio::ip::tcp>::write_handler,this,std::placeholders::_1,std::placeholders::_2, shared_from_this())));
 	}

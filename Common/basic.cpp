@@ -90,7 +90,7 @@ namespace MyProxy {
 		}
 		else {
 			lokcer.unlock();
-			logger->debug("remove(): session ID: {} not found.", id);
+			logger->trace("remove(): session ID: {} not found.", id);
 			return false;
 		}
 	}
@@ -102,7 +102,7 @@ namespace MyProxy {
 	bool SessionManager::checkNotified(SessionId id)
 	{
 		std::shared_lock<std::shared_mutex>{ destroyeNotifiedSessionsMutex };
-		if (auto iter = destroyeNotiyedSessions.find(id) != destroyeNotiyedSessions.end()) {
+		if (destroyeNotiyedSessions.find(id) != destroyeNotiyedSessions.end()) {
 			return true;
 		}
 		return false;

@@ -8,8 +8,8 @@
 #include <tuple>
 #include <queue>
 #include <vector>
-#include <map>
-#include <set>
+#include <unordered_map>
+#include <unordered_set>
 #include <memory>
 #include <utility>
 #include <mutex>
@@ -165,8 +165,8 @@ namespace MyProxy {
 		void setNotified(SessionId id);
 		bool checkNotified(SessionId id);
 	private:
-		std::map<SessionId, std::shared_ptr<BasicProxySession>> m_sessions;
-		std::set<SessionId> destroyeNotiyedSessions;
+		std::unordered_map<SessionId, std::shared_ptr<BasicProxySession>> m_sessions;
+		std::unordered_set<SessionId> destroyeNotiyedSessions;
 		std::shared_mutex destroyeNotifiedSessionsMutex;
 		std::shared_mutex sessionsMutex;
 		static std::shared_ptr<spdlog::logger> logger;

@@ -116,7 +116,6 @@ namespace MyProxy {
 			std::shared_ptr<ServerProxyTunnel> m_tunnel;
 			Logger m_logger = spdlog::stdout_color_mt("Server");
 			boost::asio::ssl::context m_ctx{ boost::asio::ssl::context::tls };
-			std::set<std::shared_ptr<ServerProxyTunnel>> tunnelSet;
 		};
 		
 	}

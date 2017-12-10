@@ -207,20 +207,27 @@ namespace MyProxy {
 		{
 			DataVec hostByte;
 			if (_addrType == AddrType::Domain) {
-				hostByte.push_back(static_cast<char>(_destHost.size()));
+				hostByte.resize(_destHost.size() + 1);
+				hostByte[0] = static_cast<char>(_destHost.size());
+				std::memcpy(hostByte.data() + 1, _destHost.data(), _destHost.size());
 			}
-			std::copy(_destHost.begin(), _destHost.end(), std::back_inserter(hostByte));
+			else {
+				hostByte.resize(_destHost.size());
+				std::memcpy(hostByte.data(), _destHost.data(), _destHost.size());
+			}
 			DataVec buf;
 			IoHelper(buf).putCastedValues<uint8_t, uint8_t, uint8_t, uint8_t, DataVec, uint16_t>
 				(_version, _state, 0, _addrType, hostByte, boost::endian::native_to_big(_destPort));
-			write(std::make_shared<DataVec>(std::move(buf)));
 			if (_state == State::Succeeded) {
+				logger()->trace("Session ID: {} handshake succeed start forwarding", id());
 				startForwarding();
 			}
 			else {
-				logger()->debug("Session ID: {} handshake state failed {}", id(), _state);
+				logger()->trace("Session ID: {} handshake state failed {}", id(), _state);
 				destroy();
 			}
+			//write() must call after startForwarding(),otherwise _running not be set to true, should fix it.
+			write(std::make_shared<DataVec>(std::move(buf))); 
 		}
 
 		class Local {
