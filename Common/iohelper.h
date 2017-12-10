@@ -214,7 +214,7 @@ namespace MyProxy {
 	}
 
 	template <>
-	static DataVec IoHelper::parseType<DataVec>(size_t size);
+	DataVec IoHelper::parseType<DataVec>(size_t size);
 	template<>
 	void IoHelper::write<std::vector<char>>(const std::vector<char> & value, size_t);
 	template<>

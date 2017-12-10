@@ -1,9 +1,8 @@
-#pragma once
 #include "iohelper.h"
 
 namespace MyProxy {
 	template <>
-	static DataVec IoHelper::parseType<DataVec>(size_t size) {
+	DataVec IoHelper::parseType<DataVec>(size_t size) {
 		return DataVec(size);
 	}
 	template<>
