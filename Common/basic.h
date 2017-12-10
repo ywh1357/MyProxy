@@ -249,7 +249,7 @@ namespace MyProxy {
 		virtual void stop() = 0;
 		virtual void setTunnel(std::shared_ptr<BasicProxyTunnel> tunnel) { 
 			if (!tunnel) {
-				throw std::exception("BasicProxySession::setTunnel(): tunnel(std::shared_ptr<BasicProxyTunnel>) unavailable");
+				throw std::runtime_error("BasicProxySession::setTunnel(): parameter: tunnel(std::shared_ptr<BasicProxyTunnel>) unavailable");
 			}
 			this->_tunnel = tunnel; 
 		}

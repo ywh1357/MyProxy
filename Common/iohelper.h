@@ -45,31 +45,23 @@ namespace MyProxy {
 	}
 
 	class DataVecBuf : public std::streambuf {
+		using Base = std::streambuf;
 	public:
-		DataVecBuf(DataVec &vec) :vec(vec), first(vec.data()), last(vec.data() + vec.size()) {
-			setg(vec.data(), vec.data(), vec.data() + vec.size());
-			setp(vec.data(), vec.data() + vec.size(), vec.data() + vec.size());
-		}
-		int_type overflow(int_type ch) override {
-			vec.push_back(ch);
-			first = vec.data();
-			last = vec.data() + vec.size();
-			setg(first, first + (gptr() - eback()), first + (egptr() - eback()));
-			setp(first, first + (pptr() - pbase()) + 1, last);
-			return ch;
-		}
-		int_type underflow() override {
-			auto current = gptr();
-			if (current < last) {
-				setg(eback(), current, last);
-				return *current;
-			}
-			return traits_type::eof();
-		}
+		DataVecBuf(DataVec &vec);
+	protected:
+		int_type overflow(int_type ch) override;
+		int_type underflow() override;
+		int_type uflow() override;
+		std::streamsize showmanyc() override;
+		std::streamsize xsputn(const char* s, std::streamsize count) override;
+		std::streamsize xsgetn(char_type* s, std::streamsize count) override;
+		//pos_type seekpos(pos_type pos, std::ios_base::openmode which = std::ios_base::in | std::ios_base::out) override;
+		//pos_type seekoff(off_type off, std::ios_base::seekdir dir, std::ios_base::openmode which = std::ios_base::in | std::ios_base::out) override;
 	private:
 		std::vector<char> &vec;
-		char* last = 0;
-		char* first = 0;
+		char* _last;
+		char* _first;
+		std::streamsize _gpos = 0;
 	};
 
 	class IoHelper {
@@ -112,16 +104,16 @@ namespace MyProxy {
 		void putCastedValues(const Args& ...args);
 
 	private:
-		template <typename O, typename T>
-		typename std::enable_if<!std::is_same<O, T>::value, void>::type
-			getSomeValue(T& value) {
-			O temp;
+		template <typename S, typename D>
+		typename std::enable_if<!std::is_same<S, D>::value, void>::type
+			getSomeValue(D& value) {
+			S temp;
 			read(temp);
-			value = static_cast<T>(temp);
+			value = static_cast<D>(temp);
 		}
-		template <typename O, typename T>
-		typename std::enable_if<std::is_same<O, T>::value, void>::type
-			getSomeValue(T& value) {
+		template <typename S, typename D>
+		typename std::enable_if<std::is_same<S, D>::value, void>::type
+			getSomeValue(D& value) {
 			read(value);
 		}
 		template <typename T>
@@ -177,9 +169,7 @@ namespace MyProxy {
 	inline void IoHelper::getValues(Args & ...args)
 	{
 		std::initializer_list<int>{
-			([this](auto &value) {
-				read(value);
-			}(args), 0)...
+			(read(args), 0)...
 		};
 	}
 
@@ -187,9 +177,7 @@ namespace MyProxy {
 	inline void IoHelper::getCastedValues(Args & ...args)
 	{
 		std::initializer_list<int>{
-			([this](auto& value) {
-				getSomeValue<Types>(value);
-			}(args), 0)...
+			(getSomeValue<Types>(args), 0)...
 		};
 	}
 
@@ -197,9 +185,7 @@ namespace MyProxy {
 	inline void IoHelper::putValues(const Args & ...args)
 	{
 		std::initializer_list<int>{
-			([this](const auto &value) {
-				write(value);
-			}(args), 0)...
+			(write(args), 0)...
 		};
 	}
 
@@ -207,9 +193,7 @@ namespace MyProxy {
 	inline void IoHelper::putCastedValues(const Args & ...args)
 	{
 		std::initializer_list<int>{
-			([this](const auto &value) {
-				write(static_cast<Types>(value));
-			}(args), 0)...
+			(write(static_cast<Types>(args)), 0)...
 		};
 	}
 
