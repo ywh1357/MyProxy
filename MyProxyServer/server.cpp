@@ -100,6 +100,7 @@ namespace MyProxy {
 			}
 			m_logger->info("Linsten at {}:{}", bindEp.address().to_string(), bindEp.port());
 			m_tcpAcceptor.reset(new ip::tcp::acceptor(m_work.get_io_service(), bindEp));
+			m_tcpAcceptor->set_option(ip::tcp::no_delay(true));
 		}
 
 		void Server::start()

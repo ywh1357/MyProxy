@@ -129,7 +129,7 @@ namespace MyProxy {
 			//SessionId m_maxSessionId = 0;
 			std::shared_ptr<ServerProxyTunnel> m_tunnel;
 			Logger m_logger = spdlog::stdout_color_mt("Server");
-			boost::asio::ssl::context m_ctx{ boost::asio::ssl::context::tls };
+			boost::asio::ssl::context m_ctx{ boost::asio::ssl::context::tlsv12_server };
 		};
 		
 	}
