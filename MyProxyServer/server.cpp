@@ -16,7 +16,7 @@ namespace MyProxy {
 				startProcess();
 			});
 		}
-		void ServerProxyTunnel::handleRead(const boost::system::error_code & ec, size_t bytes, std::shared_ptr<BasicProxyTunnel>)
+		void ServerProxyTunnel::handleRead(const boost::system::error_code & ec, size_t bytes, std::shared_ptr<BasicProxyTunnel> self)
 		{
 			if (ec) {
 				logger()->error("handleRead() error: {}", ec.message());
@@ -67,6 +67,7 @@ namespace MyProxy {
 				disconnect();
 			}
 			nextRead();
+			unused(self);
 		}
 
 		Server::Server(boost::asio::io_service &io):m_work(io)

@@ -155,6 +155,7 @@ namespace MyProxy {
 					});
 					return;
 				}
+				tunnel->connection().set_option(ip::tcp::no_delay(true));
 				auto ep = (*last).endpoint();
 				m_logger->info("Connectd to server: {}:{}", ep.address().to_string(), ep.port());
 				std::unique_lock<std::shared_mutex> locker(tunnelMutex);

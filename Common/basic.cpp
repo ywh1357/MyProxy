@@ -208,11 +208,11 @@ namespace MyProxy {
 	{
 		using namespace boost::asio;
 		async_read(m_tunnelConnection, m_readBuffer,
-			[this, self = shared_from_this()](const boost::system::error_code &ec, size_t bytes) -> size_t {
+			[this, self = this->shared_from_this()](const boost::system::error_code &ec, size_t bytes) -> size_t {
 			if (ec)
 				return 0;
 			return Package::remainBytes(buffer_cast<const char*>(m_readBuffer.data()), bytes);
-		}, std::bind(&BasicProxyTunnel::handleRead, this, std::placeholders::_1, std::placeholders::_2, shared_from_this()));
+		}, std::bind(&BasicProxyTunnel::handleRead, this, std::placeholders::_1, std::placeholders::_2, this->shared_from_this()));
 	}
 
 	void BasicProxyTunnel::dispatch(std::shared_ptr<SessionPackage> package)
