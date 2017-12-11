@@ -8,7 +8,8 @@ namespace MyProxy {
 
 		class ServerProxyTunnel : public BasicProxyTunnel {
 		public:
-			ServerProxyTunnel(boost::asio::io_service &io, boost::asio::ssl::context &ctx) :BasicProxyTunnel(io, ctx, "ServerProxyTunnel") {}
+			ServerProxyTunnel(boost::asio::io_service &io, boost::asio::ssl::context &ctx) :BasicProxyTunnel(io, ctx, "ServerProxyTunnel") {
+			}
 			~ServerProxyTunnel() {
 				//logger()->debug("destroyed");
 			}

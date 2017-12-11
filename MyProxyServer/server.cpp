@@ -114,6 +114,7 @@ namespace MyProxy {
 			m_logger->info("Start accept");
 			m_tcpAcceptor->async_accept(tunnel->connection(), [this, tunnel](const boost::system::error_code &ec) {
 				if (!ec) {
+					tunnel->connection().set_option(boost::asio::ip::tcp::no_delay(true));
 					auto ep = tunnel->connection().remote_endpoint();
 					m_logger->info("New tunnel connection from {}:{}",ep.address().to_string(),ep.port());
 					//tunnelSet.insert(tunnel);
