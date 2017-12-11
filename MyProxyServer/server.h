@@ -97,8 +97,8 @@ namespace MyProxy {
 					}
 					auto ep = (*it).endpoint();
 					this->logger()->debug("ID: {} Connect to destination: {}:{} succeed",this->id(), ep.address().to_string(), ep.port());
-					this->statusNotify(State::Succeeded);
 					this->startForwarding();
+					this->statusNotify(State::Succeeded);
 				});
 			});
 		}

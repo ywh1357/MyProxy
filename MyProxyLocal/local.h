@@ -218,11 +218,11 @@ namespace MyProxy {
 			IoHelper(buf).putCastedValues<uint8_t, uint8_t, uint8_t, uint8_t, DataVec, uint16_t>
 				(_version, _state, 0, _addrType, hostByte, boost::endian::native_to_big(_destPort));
 			if (_state == State::Succeeded) {
-				this->logger()->trace("Session ID: {} handshake succeed start forwarding", this->id());
+				this->logger()->debug("Session ID: {} handshake succeed start forwarding", this->id());
 				this->startForwarding();
 			}
 			else {
-				this->logger()->trace("Session ID: {} handshake state failed {}", this->id(), _state);
+				this->logger()->debug("Session ID: {} handshake state failed {}", this->id(), _state);
 				this->destroy();
 			}
 			//write() must call after startForwarding(),otherwise _running not be set to true, should fix it.
@@ -250,7 +250,7 @@ namespace MyProxy {
 			std::shared_ptr<LocalProxyTunnel> m_tunnel;
 			boost::asio::ip::tcp::resolver m_resolver;
 			Logger m_logger = spdlog::stdout_color_mt("Local");
-			boost::asio::ssl::context m_ctx{ boost::asio::ssl::context::tls };
+			boost::asio::ssl::context m_ctx{ boost::asio::ssl::context::tlsv12_client };
 			std::shared_mutex tunnelMutex;
 			//std::atomic<bool> _tunnelAvailable{ false };
 		};
