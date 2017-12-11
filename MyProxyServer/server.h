@@ -10,7 +10,7 @@ namespace MyProxy {
 		public:
 			ServerProxyTunnel(boost::asio::io_service &io, boost::asio::ssl::context &ctx) :BasicProxyTunnel(io, ctx, "ServerProxyTunnel") {}
 			~ServerProxyTunnel() {
-				logger()->debug("destroyed");
+				//logger()->debug("destroyed");
 			}
 			virtual void start() override {
 				logger()->debug("Server Tunnel start handshake");
@@ -78,6 +78,8 @@ namespace MyProxy {
 				[this, query, hostStr = std::move(hostStr), self = this->shared_from_this()]
 				(const boost::system::error_code &ec, typename Protocol::resolver::iterator it) {
 				if (ec) {
+					if (ec == boost::asio::error::operation_aborted)
+						return;
 					this->logger()->warn("ID: {} Resolve {}:{} failed: {}", this->id(), hostStr, _destPort, ec.message());
 					this->statusNotify(State::Failure);
 					this->destroy();
@@ -86,6 +88,8 @@ namespace MyProxy {
 				async_connect(this->socket(), it, [this, hostStr = std::move(hostStr), self]
 					(const boost::system::error_code &ec, typename Protocol::resolver::iterator it) {
 					if (ec) {
+						if (ec == boost::asio::error::operation_aborted)
+							return;
 						this->logger()->warn("ID: {} Connect to destination: {}:{} failed: {}", this->id(), hostStr, _destPort, ec.message());
 						this->statusNotify(State::Failure);
 						this->destroy();

@@ -91,7 +91,7 @@ namespace MyProxy {
 					}
 					if (support) {
 						std::shared_ptr<DataVec> rsp(new DataVec{ 0x05,0x00 });
-						async_write(this->socket(), buffer(*rsp), transfer_all(), [this, rsp](const boost::system::error_code &ec, size_t bytes) {
+						async_write(this->socket(), buffer(*rsp), transfer_all(), [this, rsp, self](const boost::system::error_code &ec, size_t bytes) {
 							if (ec) {
 								this->logger()->error("Session ID: {} response write error: {}", this->id(),ec.message());
 								this->destroy(); //error

@@ -96,12 +96,15 @@ namespace MyProxy {
 	}
 	void SessionManager::setNotified(SessionId id)
 	{
-		std::lock_guard<std::shared_mutex>{ destroyeNotifiedSessionsMutex };
+		std::unique_lock<std::shared_mutex> locker{ destroyeNotifiedSessionsMutex };
+		if (destroyeNotiyedSessions.find(id) != destroyeNotiyedSessions.end()) {
+			return;
+		}
 		destroyeNotiyedSessions.insert(id);
 	}
 	bool SessionManager::checkNotified(SessionId id)
 	{
-		std::shared_lock<std::shared_mutex>{ destroyeNotifiedSessionsMutex };
+		std::shared_lock<std::shared_mutex> locker{ destroyeNotifiedSessionsMutex };
 		if (destroyeNotiyedSessions.find(id) != destroyeNotiyedSessions.end()) {
 			return true;
 		}
@@ -117,7 +120,6 @@ namespace MyProxy {
 	}
 	BasicProxyTunnel::~BasicProxyTunnel()
 	{
-		m_logger->warn("destroyed");
 	}
 	void BasicProxyTunnel::write(std::shared_ptr<DataVec> dataPtr)
 	{

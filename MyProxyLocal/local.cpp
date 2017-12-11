@@ -23,7 +23,7 @@ namespace MyProxy {
 				}
 			});
 		}
-		void LocalProxyTunnel::handleRead(const boost::system::error_code & ec, size_t bytes, std::shared_ptr<BasicProxyTunnel>)
+		void LocalProxyTunnel::handleRead(const boost::system::error_code & ec, size_t bytes, std::shared_ptr<BasicProxyTunnel> self)
 		{
 			if (ec) {
 				logger()->error("handleRead() error: {}", ec.message());
@@ -65,6 +65,7 @@ namespace MyProxy {
 				disconnect();
 			}
 			nextRead(); //maybe change position?
+			unused(self);
 		}
 
 		Local::Local(boost::asio::io_service &io): m_work(io), m_resolver(io), m_timer(io)
