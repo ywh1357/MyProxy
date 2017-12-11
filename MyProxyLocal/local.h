@@ -234,6 +234,8 @@ namespace MyProxy {
 			Local(boost::asio::io_service &io);
 			~Local();
 			void setServer(std::string host, std::string port);
+			void setCert(std::string path);
+			void setKey(std::string path);
 			void bind(std::string port, std::string bindAddress = std::string());
 			void start();
 		private:

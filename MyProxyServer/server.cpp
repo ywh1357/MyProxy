@@ -72,12 +72,17 @@ namespace MyProxy {
 
 		Server::Server(boost::asio::io_service &io):m_work(io)
 		{
-			m_ctx.set_verify_mode(m_ctx.verify_none);
+			m_ctx.set_verify_mode(m_ctx.verify_client_once | m_ctx.verify_peer | m_ctx.verify_fail_if_no_peer_cert);
 		}
 
 		Server::~Server()
 		{
 			spdlog::drop("Server");
+		}
+
+		void Server::setCA(std::string path)
+		{
+			m_ctx.load_verify_file(path);
 		}
 
 		void Server::setCert(std::string path)

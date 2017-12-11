@@ -115,6 +115,7 @@ namespace MyProxy {
 		public:
 			Server(boost::asio::io_service &io);
 			~Server();
+			void setCA(std::string path);
 			void setCert(std::string path);
 			void setKey(std::string path);
 			void bind(std::string port, std::string bindAddress = std::string());

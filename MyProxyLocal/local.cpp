@@ -82,6 +82,16 @@ namespace MyProxy {
 			m_serverPort = port;
 		}
 
+		void Local::setCert(std::string path)
+		{
+			m_ctx.use_certificate_file(path, m_ctx.pem);
+		}
+
+		void Local::setKey(std::string path)
+		{
+			m_ctx.use_private_key_file(path, m_ctx.pem);
+		}
+
 		void Local::bind(std::string port, std::string bindAddress)
 		{
 			ip::tcp::endpoint bindEp;

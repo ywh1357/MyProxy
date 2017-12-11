@@ -9,7 +9,7 @@ int main() {
 
 	//spd::set_async_mode(4096);
 	spdlog::set_pattern("[%D %H:%M:%e] [%L] [%t] [%n]\t%v");
-	spdlog::set_level(spdlog::level::info);
+	spdlog::set_level(spdlog::level::debug);
 	//auto f = std::make_shared<spdlog::pattern_formatter>("[%D %H:%M:%e]\t[%L]\t[%n]\t%v");
 	//spdlog::set_formatter(f);
 
@@ -17,6 +17,7 @@ int main() {
 
 	MyProxy::Server::Server server(io);
 	server.bind("1084");
+	server.setCA("cacert.pem");
 	server.setCert("servercert.pem");
 	server.setKey("serverkey.pem");
 	server.start();
