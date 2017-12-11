@@ -43,7 +43,7 @@ namespace MyProxy {
 		io.getCastedValues<uint8_t, Package::SizeType, uint8_t, SessionId, uint8_t, uint8_t>
 			(package.type, size, package.method, package.id, package.protoType, package.addrType);
 		package.host.resize(package.calcHostSize(size));
-		io.getCastedValues<DataVec, uint16_t>(package.host, package.port);
+		io.getValues(package.host, package.port);
 		return io;
 	}
 

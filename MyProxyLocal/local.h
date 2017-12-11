@@ -180,7 +180,7 @@ namespace MyProxy {
 					io.getValues<DataVec>(_destHost);
 					_destPort = io.getValue<uint16_t>();
 					boost::endian::big_to_native_inplace(_destPort);
-					NewSessionRequest request{ id(), TraitsProtoType<Protocol>::type, _addrType, parseHost(_addrType, _destHost), _destPort };
+					NewSessionRequest request{ id(), TraitsProtoType::type, _addrType, parseHost(_addrType, _destHost), _destPort };
 					tunnel()->write(std::make_shared<DataVec>(request.toDataVec()));
 					this->onReceived = std::bind(&LocalProxySession<Protocol>::handshakeTunnelFinish, this, std::placeholders::_1); //need timmer
 				}

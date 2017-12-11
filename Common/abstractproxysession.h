@@ -10,16 +10,7 @@ namespace MyProxy {
 		public std::enable_shared_from_this<AbstractProxySession<Protocol>>
 	{
 	public:
-		template <typename Protocol>
 		struct TraitsProtoType;
-		template<>
-		struct TraitsProtoType<boost::asio::ip::tcp> {
-			static constexpr ProtoType type = ProtoType::Tcp;
-		};
-		template<>
-		struct TraitsProtoType<boost::asio::ip::udp> {
-			static constexpr ProtoType type = ProtoType::Udp;
-		};
 
 		AbstractProxySession(SessionId id, boost::asio::io_service &io, std::string loggerName = "Session") :
 			BasicProxySession(id,io, loggerName),
@@ -48,6 +39,15 @@ namespace MyProxy {
 		std::queue<std::shared_ptr<DataVec>> m_writeQueue;
 		//std::array<char,1024> m_readBuffer;
 		boost::asio::streambuf m_readBuffer2;
+	};
+
+	template<>
+	struct AbstractProxySession<boost::asio::ip::tcp>::TraitsProtoType {
+		static constexpr ProtoType type = ProtoType::Tcp;
+	};
+	template<>
+	struct AbstractProxySession<boost::asio::ip::udp>::TraitsProtoType {
+		static constexpr ProtoType type = ProtoType::Udp;
 	};
 
 	template<typename Protocol>
