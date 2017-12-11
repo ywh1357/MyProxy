@@ -76,8 +76,8 @@ namespace MyProxy {
 					IoHelper io(buf.get());
 					auto[ver, num] = io.getTuple<ProtoVer, size_t>(_1B, _1B);
 					if (ver != ProtoVer::Socket5) {
-						logger()->error("Session ID: {} unsupported version: 0x{:x}", id(),static_cast<uint8_t>(ver));
-						destroy(); //error unsupport
+						this->logger()->error("Session ID: {} unsupported version: 0x{:x}", this->id(),static_cast<uint8_t>(ver));
+						this->destroy(); //error unsupport
 						return;
 					}
 					DataVec authMethodList(num);
@@ -93,22 +93,22 @@ namespace MyProxy {
 						std::shared_ptr<DataVec> rsp(new DataVec{ 0x05,0x00 });
 						async_write(this->socket(), buffer(*rsp), transfer_all(), [this, rsp](const boost::system::error_code &ec, size_t bytes) {
 							if (ec) {
-								logger()->error("Session ID: {} response write error: {}", id(),ec.message());
-								destroy(); //error
+								this->logger()->error("Session ID: {} response write error: {}", id(),ec.message());
+								this->destroy(); //error
 								return;
 							}
-							handshakeTunnel();
+							this->handshakeTunnel();
 						});
 					}
 					else {
-						logger()->error("Session ID: {} unsupported method",id());
-						destroy(); //error unsupport
+						this->logger()->error("Session ID: {} unsupported method", this->id());
+						this->destroy(); //error unsupport
 						return;
 					}
 				}
 				else {
-					logger()->error("Session ID: {} handshakeLocal() error", id(), ec.message());
-					destroy();
+					this->logger()->error("Session ID: {} handshakeLocal() error", this->id(), ec.message());
+					this->destroy();
 				}
 			});
 		}
@@ -155,8 +155,8 @@ namespace MyProxy {
 					case MyProxy::Connect:
 						break;
 					default:
-						logger()->error("Session ID: {} unsupported request type {}", id(), ec.message(), _reqType);
-						destroy(); //error unsupport
+						this->logger()->error("Session ID: {} unsupported request type {}", this->id(), ec.message(), _reqType);
+						this->destroy(); //error unsupport
 						return;
 						break;
 					}
@@ -181,12 +181,12 @@ namespace MyProxy {
 					_destPort = io.getValue<uint16_t>();
 					boost::endian::big_to_native_inplace(_destPort);
 					NewSessionRequest request{ this->id(), LocalProxySession<Protocol>::TraitsProtoType::type, _addrType, parseHost(_addrType, _destHost), _destPort };
-					tunnel()->write(std::make_shared<DataVec>(request.toDataVec()));
+					this->tunnel()->write(std::make_shared<DataVec>(request.toDataVec()));
 					this->onReceived = std::bind(&LocalProxySession<Protocol>::handshakeTunnelFinish, this, std::placeholders::_1); //need timmer
 				}
 				else {
-					logger()->error("Session ID: {} handshakeTunnel() error {}", id(), ec.message());
-					destroy();
+					this->logger()->error("Session ID: {} handshakeTunnel() error {}", this->id(), ec.message());
+					this->destroy();
 				}
 			});
 		}

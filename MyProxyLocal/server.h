@@ -75,7 +75,7 @@ namespace MyProxy {
 				[this, query, hostStr = std::move(hostStr), self = this->shared_from_this()]
 				(const boost::system::error_code &ec, typename Protocol::resolver::iterator it) {
 				if (ec) {
-					this->logger()->warn("ID: {} Resolve {}:{} failed: {}", id(), hostStr, _destPort, ec.message());
+					this->logger()->warn("ID: {} Resolve {}:{} failed: {}", this->id(), hostStr, _destPort, ec.message());
 					this->statusNotify(State::Failure);
 					this->destroy();
 					return;
@@ -83,13 +83,13 @@ namespace MyProxy {
 				async_connect(socket(), it, [this, hostStr = std::move(hostStr), self]
 					(const boost::system::error_code &ec, typename Protocol::resolver::iterator it) {
 					if (ec) {
-						this->logger()->warn("ID: {} Connect to destination: {}:{} failed: {}", id(), hostStr, _destPort, ec.message());
+						this->logger()->warn("ID: {} Connect to destination: {}:{} failed: {}", this->id(), hostStr, _destPort, ec.message());
 						this->statusNotify(State::Failure);
 						this->destroy();
 						return;
 					}
 					auto ep = (*it).endpoint();
-					this->logger()->debug("ID: {} Connect to destination: {}:{} succeed",id(), ep.address().to_string(), ep.port());
+					this->logger()->debug("ID: {} Connect to destination: {}:{} succeed",this->id(), ep.address().to_string(), ep.port());
 					this->statusNotify(State::Succeeded);
 					this->startForwarding();
 				});
