@@ -26,8 +26,8 @@ int main() {
 
 	MyProxy::Server::Server server(io);
 	server.bind("1084");
-	server.setCert("E:\\pki\\servercert.pem");
-	server.setKey("E:\\pki\\serverkey.pem");
+	server.setCert("servercert.pem");
+	server.setKey("serverkey.pem");
 	server.start();
 
 	//io.run();
