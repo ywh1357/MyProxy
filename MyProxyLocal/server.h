@@ -80,7 +80,7 @@ namespace MyProxy {
 					this->destroy();
 					return;
 				}
-				async_connect(socket(), it, [this, hostStr = std::move(hostStr), self]
+				async_connect(this->socket(), it, [this, hostStr = std::move(hostStr), self]
 					(const boost::system::error_code &ec, typename Protocol::resolver::iterator it) {
 					if (ec) {
 						this->logger()->warn("ID: {} Connect to destination: {}:{} failed: {}", this->id(), hostStr, _destPort, ec.message());
