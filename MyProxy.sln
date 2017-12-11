@@ -9,8 +9,6 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MyProxyServer", "MyProxySer
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libmyproxy", "Common\Common.vcxproj", "{86D90FAD-875C-478C-815B-87805F475E67}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "test", "test\test.vcxproj", "{9A55DA5F-740E-4759-8E94-F10197404F4C}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|ARM = Debug|ARM
@@ -51,18 +49,6 @@ Global
 		{86D90FAD-875C-478C-815B-87805F475E67}.Release|x64.Build.0 = Release|x64
 		{86D90FAD-875C-478C-815B-87805F475E67}.Release|x86.ActiveCfg = Release|Win32
 		{86D90FAD-875C-478C-815B-87805F475E67}.Release|x86.Build.0 = Release|Win32
-		{9A55DA5F-740E-4759-8E94-F10197404F4C}.Debug|ARM.ActiveCfg = Debug|ARM
-		{9A55DA5F-740E-4759-8E94-F10197404F4C}.Debug|ARM.Build.0 = Debug|ARM
-		{9A55DA5F-740E-4759-8E94-F10197404F4C}.Debug|x64.ActiveCfg = Debug|x64
-		{9A55DA5F-740E-4759-8E94-F10197404F4C}.Debug|x64.Build.0 = Debug|x64
-		{9A55DA5F-740E-4759-8E94-F10197404F4C}.Debug|x86.ActiveCfg = Debug|x86
-		{9A55DA5F-740E-4759-8E94-F10197404F4C}.Debug|x86.Build.0 = Debug|x86
-		{9A55DA5F-740E-4759-8E94-F10197404F4C}.Release|ARM.ActiveCfg = Release|ARM
-		{9A55DA5F-740E-4759-8E94-F10197404F4C}.Release|ARM.Build.0 = Release|ARM
-		{9A55DA5F-740E-4759-8E94-F10197404F4C}.Release|x64.ActiveCfg = Release|x64
-		{9A55DA5F-740E-4759-8E94-F10197404F4C}.Release|x64.Build.0 = Release|x64
-		{9A55DA5F-740E-4759-8E94-F10197404F4C}.Release|x86.ActiveCfg = Release|x86
-		{9A55DA5F-740E-4759-8E94-F10197404F4C}.Release|x86.Build.0 = Release|x86
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

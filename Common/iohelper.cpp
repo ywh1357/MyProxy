@@ -2,10 +2,8 @@
 
 namespace MyProxy {
 
-	DataVecBuf::DataVecBuf(DataVec & vec) :
-		vec(vec),
-		_first(vec.data()),
-		_last(vec.data() + vec.size()) {
+	DataVecBuf::DataVecBuf(DataVec & vec) :vec(vec)
+	{
 	}
 
 	DataVecBuf::int_type DataVecBuf::overflow(int_type ch)

@@ -131,11 +131,9 @@
   <ItemGroup>
     <ClCompile Include="local.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="server.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="local.h" />
-    <ClInclude Include="server.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Common\Common.vcxproj">

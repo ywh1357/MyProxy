@@ -1,8 +1,5 @@
-#include "local.h"
 #include "server.h"
 #include "sslsetting.h"
-
-auto opensslLogger = spdlog::stdout_color_mt("OPENSSL");
 
 int main() {
 
@@ -18,18 +15,11 @@ int main() {
 
 	boost::asio::io_service io;
 
-	MyProxy::Local::Local local(io);
-	local.bind("1083");
-	local.setServer("localhost", "1084");
-	local.start();
-
 	MyProxy::Server::Server server(io);
 	server.bind("1084");
 	server.setCert("E:\\pki\\servercert.pem");
 	server.setKey("E:\\pki\\serverkey.pem");
 	server.start();
-
-	//io.run();
 
 	auto threadLogger = spdlog::stdout_logger_mt("IO Thread");
 	threadLogger->set_pattern("[%D %H:%M:%e] [%L] [%t] [%n]\t%v");

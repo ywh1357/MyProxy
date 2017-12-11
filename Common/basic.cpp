@@ -117,13 +117,6 @@ namespace MyProxy {
 	}
 	BasicProxyTunnel::~BasicProxyTunnel()
 	{
-		for (auto &session : m_manager.m_sessions) {
-			session.second->stop();
-		}
-		m_manager.m_sessions.clear();
-		if (_running.load()) {
-			disconnect();
-		}
 		m_logger->warn("destroyed");
 	}
 	void BasicProxyTunnel::write(std::shared_ptr<DataVec> dataPtr)
@@ -151,7 +144,16 @@ namespace MyProxy {
 	{
 		if (!_running.exchange(false))
 			return;
-		auto destroy = [this, self = shared_from_this()] {
+		std::function<void()> destroy = [this, self = shared_from_this()] {
+			size_t destroyCount = 0;
+			for (auto &session : m_manager.m_sessions) {
+				session.second->stop();
+				++destroyCount;
+			}
+			m_manager.m_sessions.clear();
+			if (_running.load()) {
+				disconnect();
+			}
 			boost::system::error_code ec;
 			connection().close(ec);
 			if (ec) {

@@ -59,8 +59,6 @@ namespace MyProxy {
 		//pos_type seekoff(off_type off, std::ios_base::seekdir dir, std::ios_base::openmode which = std::ios_base::in | std::ios_base::out) override;
 	private:
 		std::vector<char> &vec;
-		char* _last;
-		char* _first;
 		std::streamsize _gpos = 0;
 	};
 

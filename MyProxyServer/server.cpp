@@ -94,7 +94,6 @@ namespace MyProxy {
 				bindEp = ip::tcp::endpoint(ip::address::from_string(bindAddress), std::stoi(port));
 			}
 			m_logger->info("Linsten at {}:{}", bindEp.address().to_string(), bindEp.port());
-			boost::system::error_code ec;
 			m_tcpAcceptor.reset(new ip::tcp::acceptor(m_work.get_io_service(), bindEp));
 		}
 
@@ -106,7 +105,7 @@ namespace MyProxy {
 		void Server::startAccept()
 		{
 			auto tunnel = std::make_shared<ServerProxyTunnel>(m_work.get_io_service(), m_ctx);
-			tunnel->onDisconnected = std::bind(&Server::startAccept, this);
+			//tunnel->onDisconnected = std::bind(&Server::startAccept, this);
 			m_logger->info("Start accept");
 			m_tcpAcceptor->async_accept(tunnel->connection(), [this, tunnel](const boost::system::error_code &ec) {
 				if (!ec) {
