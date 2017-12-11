@@ -3,7 +3,6 @@
 
 int main() {
 
-	
 	using namespace std;
 
 	MyProxy::openssl_config::thread_setup();
