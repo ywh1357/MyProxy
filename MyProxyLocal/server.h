@@ -47,7 +47,7 @@ namespace MyProxy {
 				this->logger()->debug("Session ID: {} destroyed. last: {}", this->id(), --ServerProxySession<Protocol>::count);
 			}
 			virtual void start() override { 
-				handshakeDest();
+				this->handshakeDest();
 			};
 		private:
 			static size_t count;
@@ -70,28 +70,28 @@ namespace MyProxy {
 		{
 			using namespace boost::asio;
 			std::string hostStr(_destHost.data(), _destHost.size());
-			auto query = std::make_shared<Protocol::resolver::query>(hostStr, std::to_string(_destPort));
+			auto query = std::make_shared<typename Protocol::resolver::query>(hostStr, std::to_string(_destPort));
 			_resolver.async_resolve(*query, 
 				[this, query, hostStr = std::move(hostStr), self = this->shared_from_this()]
-				(const boost::system::error_code &ec, Protocol::resolver::iterator it) {
+				(const boost::system::error_code &ec, typename Protocol::resolver::iterator it) {
 				if (ec) {
-					logger()->warn("ID: {} Resolve {}:{} failed: {}", id(), hostStr, _destPort, ec.message());
-					statusNotify(State::Failure);
-					destroy();
+					this->logger()->warn("ID: {} Resolve {}:{} failed: {}", id(), hostStr, _destPort, ec.message());
+					this->statusNotify(State::Failure);
+					this->destroy();
 					return;
 				}
-				async_connect(socket(), it, [this, hostStr = std::move(hostStr), self = shared_from_this()]
-					(const boost::system::error_code &ec, Protocol::resolver::iterator it) {
+				async_connect(socket(), it, [this, hostStr = std::move(hostStr), self]
+					(const boost::system::error_code &ec, typename Protocol::resolver::iterator it) {
 					if (ec) {
-						logger()->warn("ID: {} Connect to destination: {}:{} failed: {}", id(), hostStr, _destPort, ec.message());
-						statusNotify(State::Failure);
-						destroy();
+						this->logger()->warn("ID: {} Connect to destination: {}:{} failed: {}", id(), hostStr, _destPort, ec.message());
+						this->statusNotify(State::Failure);
+						this->destroy();
 						return;
 					}
 					auto ep = (*it).endpoint();
-					logger()->debug("ID: {} Connect to destination: {}:{} succeed",id(), ep.address().to_string(), ep.port());
-					statusNotify(State::Succeeded);
-					startForwarding();
+					this->logger()->debug("ID: {} Connect to destination: {}:{} succeed",id(), ep.address().to_string(), ep.port());
+					this->statusNotify(State::Succeeded);
+					this->startForwarding();
 				});
 			});
 		}
