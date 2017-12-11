@@ -32,12 +32,14 @@ namespace MyProxy {
 	enum TunnelMethod : uint8_t { NewSession = 1, SessionDestroy, ReConnect };
 
 	class Package {
-		friend IoHelper& operator<<(IoHelper& io, const Package& package);
-		friend IoHelper& operator>>(IoHelper& io, Package& package);
+		friend IoHelper& operator<<(IoHelper&& io, const Package& package);
+		friend IoHelper& operator>>(IoHelper&& io, Package& package);
 	public:
 		enum Type : uint8_t { Unknow, Tunnel, Session };
 		using SizeType = uint32_t;
 		Type type;
+		explicit Package(const Package& other) = default;
+		explicit Package(Package&& other) = default;
 		Package(Type type = Type::Unknow) :type(type) {}
 		virtual SizeType size() const {
 			return sizeof(Type) + sizeof(SizeType);
@@ -61,15 +63,17 @@ namespace MyProxy {
 		}
 	};
 
-	IoHelper& operator<<(IoHelper& io, const Package& package);
-	IoHelper& operator>>(IoHelper& io, Package& package);
+	//IoHelper& operator<<(IoHelper&& io, const Package& package);
+	//IoHelper& operator>>(IoHelper&& io, Package& package);
 
 	class SessionPackage: public Package {
-		friend IoHelper& operator<<(IoHelper& io, const SessionPackage& package);
-		friend IoHelper& operator>>(IoHelper& io, SessionPackage& package);
+		friend IoHelper& operator<<(IoHelper&& io, const SessionPackage& package);
+		friend IoHelper& operator>>(IoHelper&& io, SessionPackage& package);
 	public:
 		SessionId sessionId;
 		DataVec data;
+		explicit SessionPackage(const SessionPackage& other) = default;
+		explicit SessionPackage(SessionPackage&& other) = default;
 		SessionPackage():Package(Type::Session){}
 		SessionPackage(SessionId id) :Package(Type::Session),sessionId(id) {}
 		SessionPackage(SessionId id, const DataVec& data) :Package(Type::Session), sessionId(id), data(data) {}
@@ -104,8 +108,8 @@ namespace MyProxy {
 	};
 
 	class NewSessionRequest : public TunnelPackage {
-		friend IoHelper& operator<<(IoHelper& io, const NewSessionRequest& package);
-		friend IoHelper& operator>>(IoHelper& io, NewSessionRequest& package);
+		friend IoHelper& operator<<(IoHelper&& io, const NewSessionRequest& package);
+		friend IoHelper& operator>>(IoHelper&& io, NewSessionRequest& package);
 	public:
 		SessionId id;
 		ProtoType protoType;

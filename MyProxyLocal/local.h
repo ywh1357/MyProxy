@@ -31,7 +31,7 @@ namespace MyProxy {
 				++LocalProxySession<Protocol>::count;
 			}
 			virtual ~LocalProxySession() {
-				logger()->debug("Session ID: {} destroyed. last: {}", id(), --LocalProxySession<Protocol>::count);
+				this->logger()->debug("Session ID: {} destroyed. last: {}", this->id(), --LocalProxySession<Protocol>::count);
 			}
 			virtual void start() override { handshakeLocal(); };
 		private:
@@ -71,7 +71,7 @@ namespace MyProxy {
 					return 0;
 				}
 			},
-				[this, buf, self = shared_from_this()](const boost::system::error_code& ec, size_t bytes) {
+				[this, buf, self = this->shared_from_this()](const boost::system::error_code& ec, size_t bytes) {
 				if (!ec) {
 					IoHelper io(buf.get());
 					auto[ver, num] = io.getTuple<ProtoVer, size_t>(_1B, _1B);
@@ -84,7 +84,7 @@ namespace MyProxy {
 					io.getValues(authMethodList);
 					bool support = false;
 					for (const auto& method : authMethodList) {
-						if (static_cast<ProtoVer>(method) == AuthType::None) {
+						if (static_cast<AuthType>(method) == AuthType::None) {
 							support = true;
 							break;
 						}
@@ -144,7 +144,7 @@ namespace MyProxy {
 					return 0;
 					break;
 				}
-			}, [this, buf, self = shared_from_this()](const boost::system::error_code& ec, size_t bytes) {
+			}, [this, buf, self = this->shared_from_this()](const boost::system::error_code& ec, size_t bytes) {
 				if (!ec) {
 					IoHelper io(buf.get());
 					//auto[ver, _reqType, nil, _addrType] = io.getTuple<ProtoVer, ReqType, short, AddrType>(_1B, _1B, _1B, _1B);
@@ -180,7 +180,7 @@ namespace MyProxy {
 					io.getValues<DataVec>(_destHost);
 					_destPort = io.getValue<uint16_t>();
 					boost::endian::big_to_native_inplace(_destPort);
-					NewSessionRequest request{ id(), TraitsProtoType::type, _addrType, parseHost(_addrType, _destHost), _destPort };
+					NewSessionRequest request{ this->id(), LocalProxySession<Protocol>::TraitsProtoType::type, _addrType, parseHost(_addrType, _destHost), _destPort };
 					tunnel()->write(std::make_shared<DataVec>(request.toDataVec()));
 					this->onReceived = std::bind(&LocalProxySession<Protocol>::handshakeTunnelFinish, this, std::placeholders::_1); //need timmer
 				}
@@ -218,15 +218,15 @@ namespace MyProxy {
 			IoHelper(buf).putCastedValues<uint8_t, uint8_t, uint8_t, uint8_t, DataVec, uint16_t>
 				(_version, _state, 0, _addrType, hostByte, boost::endian::native_to_big(_destPort));
 			if (_state == State::Succeeded) {
-				logger()->trace("Session ID: {} handshake succeed start forwarding", id());
-				startForwarding();
+				this->logger()->trace("Session ID: {} handshake succeed start forwarding", this->id());
+				this->startForwarding();
 			}
 			else {
-				logger()->trace("Session ID: {} handshake state failed {}", id(), _state);
-				destroy();
+				this->logger()->trace("Session ID: {} handshake state failed {}", this->id(), _state);
+				this->destroy();
 			}
 			//write() must call after startForwarding(),otherwise _running not be set to true, should fix it.
-			write(std::make_shared<DataVec>(std::move(buf))); 
+			this->write(std::make_shared<DataVec>(std::move(buf))); 
 		}
 
 		class Local {

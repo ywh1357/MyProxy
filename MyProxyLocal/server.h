@@ -20,6 +20,8 @@ namespace MyProxy {
 
 		template <typename Protocol>
 		class ServerProxySession : public AbstractProxySession<Protocol> {
+			using Base = AbstractProxySession<Protocol>;
+			using TraitsType = ServerProxySession<Protocol>;
 		public:
 			ServerProxySession(SessionId id, boost::asio::io_service &io, AddrType addrType,const DataVec& destHost,const uint16_t& destPort)
 				:AbstractProxySession<Protocol>(id, io, "ServerSession"), _resolver(io),
@@ -42,7 +44,7 @@ namespace MyProxy {
 				++ServerProxySession<Protocol>::count;
 			}
 			virtual ~ServerProxySession() {
-				logger()->debug("Session ID: {} destroyed. last: {}", id(), --ServerProxySession<Protocol>::count);
+				this->logger()->debug("Session ID: {} destroyed. last: {}", this->id(), --ServerProxySession<Protocol>::count);
 			}
 			virtual void start() override { 
 				handshakeDest();
@@ -70,7 +72,7 @@ namespace MyProxy {
 			std::string hostStr(_destHost.data(), _destHost.size());
 			auto query = std::make_shared<Protocol::resolver::query>(hostStr, std::to_string(_destPort));
 			_resolver.async_resolve(*query, 
-				[this, query, hostStr = std::move(hostStr), self = shared_from_this()]
+				[this, query, hostStr = std::move(hostStr), self = this->shared_from_this()]
 				(const boost::system::error_code &ec, Protocol::resolver::iterator it) {
 				if (ec) {
 					logger()->warn("ID: {} Resolve {}:{} failed: {}", id(), hostStr, _destPort, ec.message());
@@ -97,8 +99,8 @@ namespace MyProxy {
 		template<typename Protocol>
 		inline void ServerProxySession<Protocol>::statusNotify(State state)
 		{
-			SessionPackage package{ id(),DataVec{ static_cast<char>(state) } };
-			tunnel()->write(std::make_shared<DataVec>(package.toDataVec()));
+			SessionPackage package{ this->id(),DataVec{ static_cast<char>(state) } };
+			this->tunnel()->write(std::make_shared<DataVec>(package.toDataVec()));
 		}
 
 		class Server {
