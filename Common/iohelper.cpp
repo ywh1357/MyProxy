@@ -36,10 +36,13 @@ namespace MyProxy {
 		return count;
 	}
 
-	std::streamsize DataVecBuf::xsgetn(char_type * s, std::streamsize count)
+	std::streamsize DataVecBuf::xsgetn(char * s, std::streamsize count)
 	{
 		auto available = std::min(count, static_cast<std::streamsize>(vec.size() - _gpos));
-		std::memcpy(s, vec.data() + _gpos, available);
+		if (available > 0) {
+			std::memcpy(s, vec.data() + _gpos, available);
+			_gpos += available;
+		}
 		return available;
 	}
 

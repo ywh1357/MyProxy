@@ -40,7 +40,6 @@ namespace MyProxy {
 		//Write to socket.
 		void write(std::shared_ptr<DataVec> dataPtr);
 		void write_impl();
-		void write_handler(const boost::system::error_code &ec, size_t bytes, std::shared_ptr<BasicProxySession> self);
 		//Get parent tunnel.
 		std::atomic<bool> _running = false;
 	private:
@@ -95,9 +94,9 @@ namespace MyProxy {
 	inline void AbstractProxySession<Protocol>::startForwarding_impl()
 	{
 		using namespace boost::asio;
-		m_socket.async_receive(m_readBuffer2.prepare(1024 * 4), [this, self = shared_from_this()](const boost::system::error_code &ec, size_t bytes) {
+		m_socket.async_receive(m_readBuffer2.prepare(1024 * 4), [this, self = this->shared_from_this()](const boost::system::error_code &ec, size_t bytes) {
 			if (ec) {
-				if (!_running.load())
+				if (!_running.load() || ec == boost::asio::error::operation_aborted)
 					return;
 				logger()->debug("ID: {} Destroy, reason: {}", id(), ec.message());
 				destroy();
@@ -115,7 +114,7 @@ namespace MyProxy {
 	inline void AbstractProxySession<Protocol>::write(std::shared_ptr<DataVec> dataPtr)
 	{
 		//logger()->trace("AbstractProxySession<Protocol>::write() {} bytes write method posted", dataPtr->size());
-		m_writeStrand.post([this, dataPtr = std::move(dataPtr), self = shared_from_this()]{
+		m_writeStrand.post([this, dataPtr = std::move(dataPtr), self = this->shared_from_this()]{
 			if (!_running.load())
 				return;
 			//logger()->trace("AbstractProxySession<Protocol>::write() -> Lambda: {} bytes push to m_writeQueue", dataPtr->size());
@@ -131,55 +130,7 @@ namespace MyProxy {
 	}
 
 	template<>
-	inline void AbstractProxySession<boost::asio::ip::tcp>::write_impl()
-	{
-		if (m_writeQueue.empty()) {
-			//logger()->trace("AbstractProxySession<boost::asio::ip::tcp>::write_impl() m_writeQueue empty");
-			return;
-		}
-		//logger()->trace("AbstractProxySession<boost::asio::ip::tcp>::write_impl() {} bytes write method start async_write", m_writeQueue.front()->size());
-		async_write(m_socket, boost::asio::buffer(*m_writeQueue.front()), boost::asio::transfer_all(),
-			m_writeStrand.wrap(std::bind(&MyProxy::AbstractProxySession<boost::asio::ip::tcp>::write_handler,this,std::placeholders::_1,std::placeholders::_2, shared_from_this())));
-	}
-
-	template<typename Protocol>
-	inline void MyProxy::AbstractProxySession<Protocol>::write_handler(const boost::system::error_code & ec, size_t bytes, std::shared_ptr<BasicProxySession>)
-	{
-		m_writeQueue.pop(); //drop
-		if (ec) {
-			if (!_running.load())
-				return;
-			logger()->debug("ID: {} write error: {}", id(), ec.message());
-			destroy();
-			return;
-		}
-		if (!m_writeQueue.empty()) {
-			//m_writeStrand.post(std::bind(&AbstractProxySession<boost::asio::ip::tcp>::write_impl, this));
-			write_impl();
-		}
-	}
-
+	void AbstractProxySession<boost::asio::ip::tcp>::write_impl();
 	template<>
-	inline void AbstractProxySession<boost::asio::ip::udp>::write_impl()
-	{
-		//if (m_writeQueue.size() == 0) {
-		//	return;
-		//}
-		m_socket.async_send(boost::asio::buffer(*m_writeQueue.front()),
-		m_writeStrand.wrap([this, self = shared_from_this()](const boost::system::error_code &ec, size_t) {
-			m_writeQueue.pop();
-			if (ec) {
-				if (!_running.load())
-					return;
-				logger()->debug("ID: {} write error: {}", id(), ec.message());
-				destroy();
-				return;
-			}
-			m_writeQueue.pop();
-			if (!m_writeQueue.empty()) {
-				//m_writeStrand.post(std::bind(&AbstractProxySession<boost::asio::ip::udp>::write_impl, this));
-				write_impl();
-			}
-		}));
-	}
+	void AbstractProxySession<boost::asio::ip::udp>::write_impl();
 }

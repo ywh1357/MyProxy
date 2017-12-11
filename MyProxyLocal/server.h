@@ -67,17 +67,21 @@ namespace MyProxy {
 		inline void ServerProxySession<Protocol>::handshakeDest()
 		{
 			using namespace boost::asio;
-			auto query = std::make_shared<Protocol::resolver::query>(std::string(_destHost.data(),_destHost.size()) , std::to_string(_destPort));
-			_resolver.async_resolve(*query, [this, query, self = shared_from_this()](const boost::system::error_code &ec, Protocol::resolver::iterator it) {
+			std::string hostStr(_destHost.data(), _destHost.size());
+			auto query = std::make_shared<Protocol::resolver::query>(hostStr, std::to_string(_destPort));
+			_resolver.async_resolve(*query, 
+				[this, query, hostStr = std::move(hostStr), self = shared_from_this()]
+				(const boost::system::error_code &ec, Protocol::resolver::iterator it) {
 				if (ec) {
-					logger()->debug("ID: {} Resolve failed: {}",id(), ec.message());
+					logger()->warn("ID: {} Resolve {}:{} failed: {}", id(), hostStr, _destPort, ec.message());
 					statusNotify(State::Failure);
 					destroy();
 					return;
 				}
-				async_connect(socket(), it, [this, self = shared_from_this()](const boost::system::error_code &ec, Protocol::resolver::iterator it) {
+				async_connect(socket(), it, [this, hostStr = std::move(hostStr), self = shared_from_this()]
+					(const boost::system::error_code &ec, Protocol::resolver::iterator it) {
 					if (ec) {
-						logger()->debug("ID: {} Connect failed: {}",id(), ec.message());
+						logger()->warn("ID: {} Connect to destination: {}:{} failed: {}", id(), hostStr, _destPort, ec.message());
 						statusNotify(State::Failure);
 						destroy();
 						return;

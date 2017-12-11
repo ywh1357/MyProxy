@@ -54,7 +54,7 @@ namespace MyProxy {
 		int_type uflow() override;
 		std::streamsize showmanyc() override;
 		std::streamsize xsputn(const char* s, std::streamsize count) override;
-		std::streamsize xsgetn(char_type* s, std::streamsize count) override;
+		std::streamsize xsgetn(char* s, std::streamsize count) override;
 		//pos_type seekpos(pos_type pos, std::ios_base::openmode which = std::ios_base::in | std::ios_base::out) override;
 		//pos_type seekoff(off_type off, std::ios_base::seekdir dir, std::ios_base::openmode which = std::ios_base::in | std::ios_base::out) override;
 	private:

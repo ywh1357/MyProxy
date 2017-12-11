@@ -138,6 +138,7 @@
     <ClInclude Include="sslsetting.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="abstractproxysession.cpp" />
     <ClCompile Include="basic.cpp" />
     <ClCompile Include="iohelper.cpp" />
     <ClCompile Include="sslsetting.cpp" />

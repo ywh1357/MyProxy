@@ -9,7 +9,7 @@ namespace MyProxy {
 
 	namespace Local {
 
-		std::string parseHost(AddrType type, const DataVec &vec);
+		DataVec parseHost(AddrType type, const DataVec &vec);
 
 		class LocalProxyTunnel : public BasicProxyTunnel {
 		public:
@@ -53,7 +53,7 @@ namespace MyProxy {
 		size_t LocalProxySession<Protocol>::count = 0;
 
 		template <typename Protocol>
-		void LocalProxySession<Protocol>::handshakeLocal() {
+		inline void LocalProxySession<Protocol>::handshakeLocal() {
 			using namespace boost::asio;
 			auto buf = std::make_shared<streambuf>();
 			async_read(this->socket(), *buf, [this, buf](const boost::system::error_code& ec, std::size_t bytes) -> size_t {
@@ -178,10 +178,9 @@ namespace MyProxy {
 					}
 					_destHost.resize(hostSize);
 					io.getValues<DataVec>(_destHost);
-					std::string hostStr = parseHost(_addrType, _destHost);
 					_destPort = io.getValue<uint16_t>();
 					boost::endian::big_to_native_inplace(_destPort);
-					NewSessionRequest request{ id(), TraitsProtoType<Protocol>::type, _addrType, DataVec{ hostStr.begin(), hostStr.end() }, _destPort };
+					NewSessionRequest request{ id(), TraitsProtoType<Protocol>::type, _addrType, parseHost(_addrType, _destHost), _destPort };
 					tunnel()->write(std::make_shared<DataVec>(request.toDataVec()));
 					this->onReceived = std::bind(&LocalProxySession<Protocol>::handshakeTunnelFinish, this, std::placeholders::_1); //need timmer
 				}

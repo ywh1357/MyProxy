@@ -19,6 +19,7 @@
 namespace MyProxy {
 
 	using SessionId = uint32_t;
+	constexpr static SessionId sessionIdMax = std::numeric_limits<SessionId>::max();
 	using Logger = std::shared_ptr<spdlog::logger>;
 
 	enum ProtoVer : uint8_t { Socket5 = 0x05 };
@@ -112,10 +113,8 @@ namespace MyProxy {
 		DataVec host;
 		uint16_t port;
 		NewSessionRequest() :TunnelPackage(TunnelMethod::NewSession){}
-		NewSessionRequest(const SessionId& id, const ProtoType& protoType, const AddrType& addrType, const DataVec& host, const uint16_t& port) :
-			TunnelPackage(TunnelMethod::NewSession), id(id), protoType(protoType), addrType(addrType), host(host), port(port){}
-		NewSessionRequest(SessionId&& id, ProtoType&& protoType, AddrType&& addrType, DataVec&& host, uint16_t&& port) :
-			TunnelPackage(TunnelMethod::NewSession), id(id), protoType(protoType), addrType(addrType), host(host), port(port) {}
+		NewSessionRequest(const SessionId& id, const ProtoType& protoType, const AddrType& addrType, DataVec&& host, const uint16_t& port) :
+			TunnelPackage(TunnelMethod::NewSession), id(id), protoType(protoType), addrType(addrType), host(std::forward<DataVec>(host)), port(port){}
 		virtual SizeType size() const override {
 			return (SizeType)(exceptHostSize() + host.size());
 		}
@@ -228,7 +227,6 @@ namespace MyProxy {
 		std::atomic<bool> _running{ true };
 		std::atomic<bool> _handshakeFinished{ false };
 	};
-
 
 	class BasicProxySession {
 	public:

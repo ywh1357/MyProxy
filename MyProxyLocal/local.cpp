@@ -149,10 +149,10 @@ namespace MyProxy {
 
 		SessionId Local::newSessionId()
 		{
-			return m_maxSessionId++;
+			return (m_maxSessionId == sessionIdMax ? (m_maxSessionId = 0) : m_maxSessionId++);
 		}
 
-		std::string parseHost(AddrType type, const DataVec &vec)
+		DataVec parseHost(AddrType type, const DataVec &vec)
 		{
 			constexpr int maxlen = boost::asio::detail::max_addr_v6_str_len;
 			std::vector<char> buf(maxlen);
@@ -178,16 +178,16 @@ namespace MyProxy {
 			case MyProxy::IPV4:
 			case MyProxy::IPV6:
 				boost::asio::detail::socket_ops::inet_ntop(af, vec.data(), buf.data(), maxlen, 0, ec);
+				if (ec) {
+					throw ec;
+				}
 				break;
 			case MyProxy::Domain:
-				buf = vec;
+				return vec;
 				break;
 			}
-			if (ec) {
-				throw ec;
-			}
 			buf.shrink_to_fit();
-			return std::string(buf.data(), buf.size());
+			return buf;
 		}
 }
 }
