@@ -169,7 +169,7 @@ namespace MyProxy {
 				af = AF_INET6;
 				break;
 			default:
-				throw std::exception("parseHost: error type", 1);
+				throw std::runtime_error("parseHost: error type");
 				break;
 			}
 			boost::system::error_code ec;

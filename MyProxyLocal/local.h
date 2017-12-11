@@ -93,7 +93,7 @@ namespace MyProxy {
 						std::shared_ptr<DataVec> rsp(new DataVec{ 0x05,0x00 });
 						async_write(this->socket(), buffer(*rsp), transfer_all(), [this, rsp](const boost::system::error_code &ec, size_t bytes) {
 							if (ec) {
-								this->logger()->error("Session ID: {} response write error: {}", id(),ec.message());
+								this->logger()->error("Session ID: {} response write error: {}", this->id(),ec.message());
 								this->destroy(); //error
 								return;
 							}
@@ -172,8 +172,8 @@ namespace MyProxy {
 						hostSize = io.getValue<uint8_t>();
 						break;
 					default:
-						logger()->error("Session ID: {} unknown address type {}", id(), ec.message(), _addrType);
-						destroy(); //error
+						this->logger()->error("Session ID: {} unknown address type {}", this->id(), ec.message(), _addrType);
+						this->destroy(); //error
 						break;
 					}
 					_destHost.resize(hostSize);
