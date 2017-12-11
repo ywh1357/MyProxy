@@ -238,10 +238,12 @@ namespace MyProxy {
 			void start();
 		private:
 			void startAccept();
+			void startConnect(std::shared_ptr<LocalProxyTunnel> tunnel, boost::asio::ip::tcp::resolver::iterator it);
 			SessionId newSessionId();
 		private:
 			boost::asio::io_service::work m_work;
 			std::shared_ptr<boost::asio::ip::tcp::acceptor> m_tcpAcceptor;
+			boost::asio::deadline_timer m_timer;
 			std::string m_serverHost;
 			std::string m_serverPort;
 			SessionId m_maxSessionId = 0;

@@ -144,6 +144,9 @@ namespace MyProxy {
 	{
 		if (!_running.exchange(false))
 			return;
+		if (onDisconnected) {
+			onDisconnected();
+		}
 		std::function<void()> destroy = [this, self = shared_from_this()] {
 			size_t destroyCount = 0;
 			for (auto &session : m_manager.m_sessions) {
@@ -160,9 +163,6 @@ namespace MyProxy {
 				m_logger->debug("Close error: ", ec.message());
 			}
 			m_logger->debug("Disconnected");
-			if (onDisconnected) {
-				onDisconnected();
-			}
 		};
 		if (!_handshakeFinished.exchange(false)) {
 			destroy();

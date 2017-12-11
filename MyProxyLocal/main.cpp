@@ -17,7 +17,7 @@ int main() {
 
 	MyProxy::Local::Local local(io);
 	local.bind("1083");
-	local.setServer("localhost", "1084");
+	local.setServer("home.ywh1357.com", "10840");
 	local.start();
 
 	auto threadLogger = spdlog::stdout_logger_mt("IO Thread");

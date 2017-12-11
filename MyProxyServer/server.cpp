@@ -28,6 +28,10 @@ namespace MyProxy {
 				nextRead();
 				return;
 			}
+			if (!_running.load()) {
+				logger()->warn("handleRead() cancel: tunnel stoped");
+				return;
+			}
 			auto data = buffer_cast<const char*>(readbuf().data());
 			auto type = static_cast<Package::Type>(data[0]);
 			if (type == Package::Type::Session) {

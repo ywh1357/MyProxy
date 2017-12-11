@@ -1,4 +1,5 @@
 #include "local.h"
+#include <time.h>
 
 using namespace boost::asio;
 //using boost::asio::detail::socket_ops::*;
@@ -34,6 +35,10 @@ namespace MyProxy {
 				nextRead();
 				return;
 			}
+			if (!_running.load()) {
+				logger()->warn("handleRead() cancel: tunnel stoped");
+				return;
+			}
 			auto data = boost::asio::buffer_cast<const char*>(readbuf().data());
 			auto type = static_cast<Package::Type>(data[0]);
 			if (type == Package::Type::Session) {
@@ -62,7 +67,7 @@ namespace MyProxy {
 			nextRead(); //maybe change position?
 		}
 
-		Local::Local(boost::asio::io_service &io): m_work(io), m_resolver(io)
+		Local::Local(boost::asio::io_service &io): m_work(io), m_resolver(io), m_timer(io)
 		{
 			m_ctx.set_verify_mode(m_ctx.verify_none);
 		}
@@ -109,20 +114,7 @@ namespace MyProxy {
 					//retry?
 					return;
 				}
-				async_connect(tunnel->connection(), it, [this, tunnel](const boost::system::error_code &ec, ip::tcp::resolver::iterator it) {
-					if (ec) {
-						m_logger->error("Connectd failed: {}", ec.message());
-						//retry?
-						return;
-					}
-					auto ep = (*it).endpoint();
-					m_logger->info("Connectd to server: {}:{}", ep.address().to_string(), ep.port());
-					std::unique_lock<std::shared_mutex> locker(tunnelMutex);
-					m_tunnel = tunnel;
-					m_tunnel->start();
-					m_tunnel->onReady = std::bind(&Local::startAccept, this);
-					//startAccept();
-				});
+				startConnect(tunnel, it);
 			});
 		}
 
@@ -144,6 +136,31 @@ namespace MyProxy {
 					m_logger->debug("async_accept error: ", ec.message());
 				}
 				startAccept();
+			});
+		}
+
+		void Local::startConnect(std::shared_ptr<LocalProxyTunnel> tunnel, ip::tcp::resolver::iterator it)
+		{
+			async_connect(tunnel->connection(), it, [this, tunnel, it](const boost::system::error_code &ec, ip::tcp::resolver::iterator last) {
+				if (ec) {
+					m_logger->error("Connectd failed: {}", ec.message());
+					m_timer.expires_from_now(boost::posix_time::seconds(5));
+					m_timer.async_wait([this, tunnel, it = std::move(it)](const boost::system::error_code &ec) {
+						if (ec) {
+							m_logger->warn("Timer error: {}",ec.message());
+							return;
+						}
+						startConnect(tunnel, std::move(it));
+					});
+					return;
+				}
+				auto ep = (*last).endpoint();
+				m_logger->info("Connectd to server: {}:{}", ep.address().to_string(), ep.port());
+				std::unique_lock<std::shared_mutex> locker(tunnelMutex);
+				m_tunnel = tunnel;
+				m_tunnel->start();
+				m_tunnel->onReady = std::bind(&Local::startAccept, this);
+				//startAccept();
 			});
 		}
 

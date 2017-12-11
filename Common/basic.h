@@ -218,6 +218,9 @@ namespace MyProxy {
 	public:
 		std::function<void()> onReady;
 		std::function<void()> onDisconnected;
+	protected:
+		std::atomic<bool> _running{ true };
+		std::atomic<bool> _handshakeFinished{ false };
 	private:
 		//boost::asio::ip::tcp::endpoint m_serverEndpoint;
 		boost::asio::io_service &io;
@@ -228,8 +231,6 @@ namespace MyProxy {
 		boost::asio::streambuf m_readBuffer;
 		SessionManager m_manager;
 		Logger m_logger;
-		std::atomic<bool> _running{ true };
-		std::atomic<bool> _handshakeFinished{ false };
 	};
 
 	class BasicProxySession {
