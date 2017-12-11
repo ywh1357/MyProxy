@@ -44,6 +44,7 @@ namespace MyProxy {
 				if (method == TunnelMethod::NewSession) {
 					NewSessionRequest request;
 					IoHelper(&readbuf()) >> request;
+					logger()->debug("NewSessionRequest received ID: {}", request.id);
 					std::shared_ptr<BasicProxySession> session;
 					if (request.protoType == ProtoType::Tcp) {
 						session = std::make_shared<ServerProxySession<ip::tcp>>(std::move(request), service());
