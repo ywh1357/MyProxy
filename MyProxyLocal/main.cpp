@@ -5,7 +5,7 @@ int main() {
 
 	using namespace std;
 
-	MyProxy::openssl_config::thread_setup();
+	MyProxy::openssl_config::thread_setup();	
 
 	//spd::set_async_mode(4096);
 	spdlog::set_pattern("[%D %H:%M:%e] [%L] [%t] [%n]\t%v");
@@ -16,8 +16,8 @@ int main() {
 	boost::asio::io_service io;
 
 	MyProxy::Local::Local local(io);
-	local.bind("1083");
-	local.setServer("45.76.53.20", "1084");
+	local.bind("1083","127.0.0.1");
+	local.setServer("home.ywh1357.com", "10840");
 	local.setCert("clientcert.pem");
 	local.setKey("clientkey.pem");
 	local.start();

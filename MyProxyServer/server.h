@@ -86,6 +86,14 @@ namespace MyProxy {
 					this->destroy();
 					return;
 				}
+				this->logger()->debug("ID: {} destination: {}:{} Resolved:", this->id(), hostStr, _destPort);
+				auto begin = it;
+				typename Protocol::resolver::iterator end;
+				while (begin != end) {
+					auto entry = *(begin++);
+					this->logger()->debug("ID: {} Resolved to: {}:{}", this->id(), entry.endpoint().address().to_string(), entry.endpoint().port());
+				}
+				this->logger()->debug("ID: {} Resolve {}:{} failed: {}", this->id(), hostStr, _destPort, ec.message());
 				async_connect(this->socket(), it, [this, hostStr = std::move(hostStr), self]
 					(const boost::system::error_code &ec, typename Protocol::resolver::iterator it) {
 					if (ec) {

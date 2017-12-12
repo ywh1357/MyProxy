@@ -136,6 +136,7 @@
     <ClInclude Include="basic.h" />
     <ClInclude Include="define.h" />
     <ClInclude Include="iohelper.h" />
+    <ClInclude Include="packages.h" />
     <ClInclude Include="sslsetting.h" />
   </ItemGroup>
   <ItemGroup>

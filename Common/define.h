@@ -1,4 +1,7 @@
 #pragma once
+#ifndef MYPROXY_DEFINE
+#define MYPROXY_DEFINE
+
 #include <vector>
 #include <memory>
 #include <spdlog\logger.h>
@@ -18,5 +21,6 @@ namespace MyProxy {
 
 	enum TunnelMethod : uint8_t { NewSession = 1, SessionDestroy, ReConnect };
 
-
 }
+
+#endif // MYPROXY_DEFINE
