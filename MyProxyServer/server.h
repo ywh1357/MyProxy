@@ -50,7 +50,7 @@ namespace MyProxy {
 			}
 			static std::shared_mutex _resolveCacheMutex;
 			template<typename Protocol>
-			static typename CacheMapType<Protocol> _resolveCache;
+			static ResolveCache::CacheMapType<Protocol> _resolveCache;
 		};
 
 		template<typename Protocol>
