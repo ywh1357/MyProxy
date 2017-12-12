@@ -26,18 +26,18 @@ namespace MyProxy {
 			template<typename Protocol>
 			using CacheMapType = typename std::unordered_map<
 				typename Protocol::resolver::query,
-				typename CacheRecord<Protocol>,
+				CacheRecord<Protocol>,
 				std::function<size_t(const typename Protocol::resolver::query&)>,
 				std::function<size_t(const typename Protocol::resolver::query&, const typename Protocol::resolver::query&)> >;
 			template <typename Protocol>
-			static const typename CacheMapType<Protocol>::iterator Unavailable;
+			static const typename ResolveCache::CacheMapType<Protocol>::iterator Unavailable;
 			template<typename Protocol>
 			static void cache(const typename Protocol::resolver::query &query, const typename CacheRecord<Protocol>::IteratorType &iter) {
-				resolveCache<Protocol>.insert_or_assign(query, iter);
+				_resolveCache<Protocol>.insert_or_assign(query, iter);
 			}
 			template<typename Protocol>
-			static typename CacheMapType<Protocol>::iterator fetch(const typename Protocol::resolver::query &query) {
-				return resolveCache<Protocol>.find(query);
+			static typename ResolveCache::CacheMapType<Protocol>::iterator fetch(const typename Protocol::resolver::query &query) {
+				return _resolveCache<Protocol>.find(query);
 			}
 		private:
 			template<typename Protocol>
@@ -46,11 +46,11 @@ namespace MyProxy {
 			}
 			template<typename Protocol>
 			static size_t queryHasher(const typename Protocol::resolver::query & q) {
-				return std::hash <std::string>{}(q.host_name() + ':' + q.service_name());
+				return std::hash<std::string>{}(q.host_name() + ':' + q.service_name());
 			}
-			static std::shared_mutex resolveCacheMutex;
+			static std::shared_mutex _resolveCacheMutex;
 			template<typename Protocol>
-			static CacheMapType<Protocol> resolveCache;
+			static typename CacheMapType<Protocol> _resolveCache;
 		};
 
 		template<typename Protocol>
@@ -60,7 +60,7 @@ namespace MyProxy {
 		const typename ResolveCache::CacheMapType<Protocol>::iterator ResolveCache::Unavailable = typename ResolveCache::CacheMapType<Protocol>::iterator();
 
 		template<typename Protocol>
-		typename ResolveCache::CacheMapType<Protocol> ResolveCache::resolveCache = typename ResolveCache::CacheMapType<Protocol>(0,
+		typename ResolveCache::CacheMapType<Protocol> ResolveCache::_resolveCache = typename ResolveCache::CacheMapType<Protocol>(0,
 			std::bind(&ResolveCache::queryHasher<Protocol>, std::placeholders::_1),
 			std::bind(&ResolveCache::queryEqualTo<Protocol>, std::placeholders::_1, std::placeholders::_2)
 			);
