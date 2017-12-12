@@ -73,6 +73,8 @@ namespace MyProxy {
 	}
 	void BasicProxyTunnel::write(std::shared_ptr<DataVec> dataPtr)
 	{
+		if (!_running.load())
+			return;
 		m_writeStrand.post([this, dataPtr = std::move(dataPtr), self = shared_from_this()]{
 			if (!_running.load()) {
 				m_logger->warn("BasicProxyTunnel::write() failed: Tunnel not running");
