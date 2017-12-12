@@ -113,7 +113,7 @@ namespace MyProxy {
 		virtual void start() = 0;
 		virtual void stop() = 0;
 		//destroy session, if !notified, notify peer
-		virtual void destroy(bool notified) = 0;
+		virtual void destroy(bool notified = false) = 0;
 		virtual void setTunnel(std::shared_ptr<BasicProxyTunnel> tunnel) { 
 			if (!tunnel) {
 				throw std::runtime_error("BasicProxySession::setTunnel(): parameter: tunnel(std::shared_ptr<BasicProxyTunnel>) unavailable");

@@ -102,10 +102,8 @@ namespace MyProxy {
 			onDisconnected();
 		}
 		std::function<void()> destroy = [this, self = shared_from_this()] {
-			size_t destroyCount = 0;
 			for (auto &session : m_manager.m_sessions) {
-				session.second->stop();
-				++destroyCount;
+				session.second->destroy(true);
 			}
 			m_manager.m_sessions.clear();
 			if (_running.load()) {
