@@ -27,8 +27,8 @@ namespace MyProxy {
 			using CacheMapType = typename std::unordered_map<
 				typename Protocol::resolver::query,
 				typename CacheRecord<Protocol>,
-				typename std::function<size_t(const typename Protocol::resolver::query&)>,
-				typename std::function<size_t(const typename Protocol::resolver::query&, const typename Protocol::resolver::query&)>
+				typename std::function<typename size_t(const typename Protocol::resolver::query&)>,
+				typename std::function<typename size_t(const typename Protocol::resolver::query&, const typename Protocol::resolver::query&)>
 			>;
 			template <typename Protocol>
 			const static typename CacheMapType<Protocol>::iterator Unavailable;
