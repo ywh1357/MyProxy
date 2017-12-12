@@ -5,6 +5,19 @@ using namespace boost::asio;
 namespace MyProxy {
 	namespace Server {
 
+		std::shared_mutex ResolveCache::_resolveCacheMutex;
+
+		template<typename Protocol>
+		const typename ResolveCache::CacheRecord<Protocol>::IteratorType ResolveCache::CacheRecord<Protocol>::end = typename Protocol::resolver::iterator();
+
+		template <typename Protocol>
+		const typename ResolveCache::CacheMapType<Protocol>::iterator ResolveCache::Unavailable = typename ResolveCache::CacheMapType<Protocol>::iterator();
+
+		template<typename Protocol>
+		typename ResolveCache::CacheMapType<Protocol> ResolveCache::_resolveCache = typename ResolveCache::CacheMapType<Protocol>(0,
+			std::bind(&ResolveCache::queryHasher<Protocol>, std::placeholders::_1),
+			std::bind(&ResolveCache::queryEqualTo<Protocol>, std::placeholders::_1, std::placeholders::_2)
+			);
 
 		void ServerProxyTunnel::handshake()
 		{

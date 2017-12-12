@@ -3,6 +3,9 @@
 #include "abstractproxysession.h"
 #include <chrono>
 #include <unordered_map>
+#include <mutex>
+#include <shared_mutex>
+#include <thread>
 
 namespace MyProxy {
 
@@ -13,6 +16,7 @@ namespace MyProxy {
 			template<typename Protocol>
 			struct CacheRecord {
 				using IteratorType = typename Protocol::resolver::iterator;
+				//end of the endpoints list
 				static const IteratorType end;
 				IteratorType it;
 				std::chrono::time_point<std::chrono::system_clock> expireTime;
@@ -23,20 +27,30 @@ namespace MyProxy {
 					it(IteratorType::create(it, IteratorType(), host, service)),
 					expireTime(std::chrono::system_clock::now() + expire) {	}
 			};
+			//the std::unordered_map _resolveCache type
 			template<typename Protocol>
 			using CacheMapType = typename std::unordered_map<
 				typename Protocol::resolver::query,
 				CacheRecord<Protocol>,
 				std::function<size_t(const typename Protocol::resolver::query&)>,
 				std::function<size_t(const typename Protocol::resolver::query&, const typename Protocol::resolver::query&)> >;
+			//determine _resolveCache's iterator valid
 			template <typename Protocol>
 			static const typename ResolveCache::CacheMapType<Protocol>::iterator Unavailable;
+			//cache record
 			template<typename Protocol>
 			static void cache(const typename Protocol::resolver::query &query, const typename CacheRecord<Protocol>::IteratorType &iter) {
-				_resolveCache<Protocol>.insert_or_assign(query, iter);
+				//write lock
+				std::unique_lock<std::shared_mutex> locker(_resolveCacheMutex);
+				//insert or rewrite expired record
+				_resolveCache<Protocol>.insert_or_assign(query, CacheRecord<Protocol>(iter, query.host_name(), query.service_name()));
 			}
+			//fetch record
 			template<typename Protocol>
 			static typename ResolveCache::CacheMapType<Protocol>::iterator fetch(const typename Protocol::resolver::query &query) {
+				//read lock
+				std::shared_lock<std::shared_mutex> locker(_resolveCacheMutex);
+				//return iterator
 				return _resolveCache<Protocol>.find(query);
 			}
 		private:
@@ -48,22 +62,11 @@ namespace MyProxy {
 			static size_t queryHasher(const typename Protocol::resolver::query & q) {
 				return std::hash<std::string>{}(q.host_name() + ':' + q.service_name());
 			}
+			//fetch or cache mutex
 			static std::shared_mutex _resolveCacheMutex;
 			template<typename Protocol>
 			static ResolveCache::CacheMapType<Protocol> _resolveCache;
 		};
-
-		template<typename Protocol>
-		const typename ResolveCache::CacheRecord<Protocol>::IteratorType ResolveCache::CacheRecord<Protocol>::end = typename Protocol::resolver::iterator();
-
-		template <typename Protocol>
-		const typename ResolveCache::CacheMapType<Protocol>::iterator ResolveCache::Unavailable = typename ResolveCache::CacheMapType<Protocol>::iterator();
-
-		template<typename Protocol>
-		typename ResolveCache::CacheMapType<Protocol> ResolveCache::_resolveCache = typename ResolveCache::CacheMapType<Protocol>(0,
-			std::bind(&ResolveCache::queryHasher<Protocol>, std::placeholders::_1),
-			std::bind(&ResolveCache::queryEqualTo<Protocol>, std::placeholders::_1, std::placeholders::_2)
-			);
 
 		class ServerProxyTunnel : public BasicProxyTunnel {
 		public:
@@ -132,6 +135,7 @@ namespace MyProxy {
 		inline void ServerProxySession<Protocol>::handshakeDest()
 		{
 			using namespace boost::asio;
+			//connect method
 			auto do_connect = [this, self = this->shared_from_this()](typename Protocol::resolver::iterator it, std::string hostStr){
 				async_connect(this->socket(), it, [this, hostStr = std::move(hostStr), self]
 				(const boost::system::error_code &ec, typename Protocol::resolver::iterator it) {
@@ -153,12 +157,17 @@ namespace MyProxy {
 			using flags = boost::asio::ip::resolver_query_base::flags;
 			auto query = std::make_shared<typename Protocol::resolver::query>
 				(hostStr, std::to_string(_destPort), flags::numeric_service | flags::address_configured);
+			//fetch resolve record cache map iterator
 			auto iter = ResolveCache::fetch<Protocol>(*query);
+			//check iter vaild and expire time
 			if (iter != ResolveCache::Unavailable<Protocol> && !iter->second.expired()) {
+				this->logger()->debug("ID: {} destination: {}:{} resolved cache fetch succeed.", this->id(), hostStr, _destPort);
+				//use cached record
 				do_connect(iter->second.it, std::move(hostStr));
 				return;
 			}
 			else {
+				//or resolve
 				_resolver.async_resolve(*query,
 					[this, query, hostStr = std::move(hostStr), do_connect, self = this->shared_from_this()]
 				(const boost::system::error_code &ec, typename Protocol::resolver::iterator it) {
@@ -170,7 +179,8 @@ namespace MyProxy {
 						this->destroy();
 						return;
 					}
-					this->logger()->debug("ID: {} destination: {}:{} Resolved", this->id(), hostStr, _destPort);
+					ResolveCache::cache<Protocol>(*query, it);
+					this->logger()->debug("ID: {} destination: {}:{} resolved, recored cached.", this->id(), hostStr, _destPort);
 					do_connect(it, std::move(hostStr));
 				});
 			}
