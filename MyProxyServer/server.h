@@ -13,7 +13,7 @@ namespace MyProxy {
 			template<typename Protocol>
 			struct CacheRecord {
 				using IteratorType = typename Protocol::resolver::iterator;
-				const static IteratorType end;
+				static const IteratorType end;
 				IteratorType it;
 				std::chrono::time_point<std::chrono::system_clock> expireTime;
 				bool expired() {
@@ -31,7 +31,7 @@ namespace MyProxy {
 				typename std::function<typename size_t(const typename Protocol::resolver::query&, const typename Protocol::resolver::query&)>
 			>;
 			template <typename Protocol>
-			const static typename CacheMapType<Protocol>::iterator Unavailable;
+			static const typename CacheMapType<Protocol>::iterator Unavailable;
 			template<typename Protocol>
 			static void cache(const typename Protocol::resolver::query &query, const typename CacheRecord<Protocol>::IteratorType &iter) {
 				resolveCache<Protocol>.insert_or_assign(query, iter);
