@@ -168,12 +168,12 @@ namespace MyProxy {
 	void BasicProxyTunnel::dispatch(std::shared_ptr<SessionPackage> package)
 	{
 		auto session = m_manager.get(package->sessionId);
-		if (session) {
+		if (session && session->onReceived) {
 			session->onReceived(package);
 		}
 		else {
 			if (!m_manager.checkNotified(package->sessionId)){
-				m_logger->debug("dispatch(): session ID: {} not found", package->sessionId);
+				m_logger->debug("dispatch() cancel: session ID: {} not found or not ready", package->sessionId);
 				sessionDestroyNotify(package->sessionId);
 			}
 		}

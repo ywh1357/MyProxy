@@ -52,17 +52,21 @@ namespace MyProxy {
 				if (method == TunnelMethod::SessionDestroy) {
 					SessionId sessionId;
 					std::tie(std::ignore, std::ignore, std::ignore, sessionId) = IoHelper(&readbuf()).getTuple<Package::Type, Package::SizeType, TunnelMethod, SessionId>(_1B, _4B, _1B, _4B);
-					manager().remove(sessionId);
+					auto session = manager().get(sessionId);
+					if (session)
+						session->destroy(true);
 				}
 				else {
 					logger()->error("Unknown tunnel method");
 					disconnect();
+					return;
 				}
 			}
 			else {
-				auto header = *buffer_cast<const uint64_t*>(readbuf().data());
-				logger()->error("Unknown package received, package head: {0:x}", header);
+				//auto header = *buffer_cast<const uint64_t*>(readbuf().data());
+				logger()->error("Unknown package received");
 				disconnect();
+				return;
 			}
 			nextRead(); //maybe change position?
 			unused(self);

@@ -22,8 +22,8 @@ namespace MyProxy {
 		typename Protocol::socket& socket() { return m_socket; }
 		virtual void start() = 0;
 		virtual void stop() override;
-		//Stop and remove self from session manager.
-		virtual void destroy();
+		//destroy session, if !notified, notify peer
+		virtual void destroy(bool notified = false) override;
 	protected:
 		//Read socket and write to tunnel.
 		virtual void startForwarding();
@@ -53,6 +53,7 @@ namespace MyProxy {
 	template<typename Protocol>
 	inline void AbstractProxySession<Protocol>::stop()
 	{
+		auto self = this->shared_from_this();
 		if (m_socket.is_open()) {
 			boost::system::error_code ec;
 			m_socket.shutdown(m_socket.shutdown_both, ec);
@@ -65,17 +66,20 @@ namespace MyProxy {
 				logger()->debug("ID: {} Close error: {}",id(), ec.message());
 			}
 		}
+		unused(self);
 	}
 
 	template<typename Protocol>
-	inline void AbstractProxySession<Protocol>::destroy()
+	inline void AbstractProxySession<Protocol>::destroy(bool notified)
 	{
+		auto self = this->shared_from_this();
 		if (_running.exchange(false)) {
-			auto sessionId = this->id();
-			if (tunnel()->manager().remove(sessionId)) {
-				tunnel()->sessionDestroyNotify(sessionId);
+			if (this->tunnel()->manager().remove(this->id())) {
+				if(!notified)
+					this->tunnel()->sessionDestroyNotify(this->id());
 			}
 		}
+		unused(self);
 	}
 
 	template<typename Protocol>
@@ -104,7 +108,8 @@ namespace MyProxy {
 			}
 			auto data = buffer_cast<const char*>(m_readBuffer2.data());
 			SessionPackage package{ id(),DataVec{ data, data + bytes } };
-			tunnel()->write(std::make_shared<DataVec>(package.toDataVec()));
+			auto dp = std::make_shared<DataVec>(package.toDataVec());
+			tunnel()->write(std::move(dp));
 			m_readBuffer2.consume(bytes);
 			startForwarding_impl();
 		});
