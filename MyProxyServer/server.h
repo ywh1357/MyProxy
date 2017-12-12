@@ -74,7 +74,9 @@ namespace MyProxy {
 		{
 			using namespace boost::asio;
 			std::string hostStr(_destHost.data(), _destHost.size());
-			auto query = std::make_shared<typename Protocol::resolver::query>(hostStr, std::to_string(_destPort));
+			using flags = boost::asio::ip::resolver_query_base::flags;
+			auto query = std::make_shared<typename Protocol::resolver::query>
+				(hostStr, std::to_string(_destPort), flags::numeric_service | flags::address_configured);
 			_resolver.async_resolve(*query, 
 				[this, query, hostStr = std::move(hostStr), self = this->shared_from_this()]
 				(const boost::system::error_code &ec, typename Protocol::resolver::iterator it) {
