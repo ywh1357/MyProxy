@@ -4,7 +4,7 @@
 
 #include <vector>
 #include <memory>
-#include <spdlog\logger.h>
+#include <spdlog/logger.h>
 
 namespace MyProxy {
 
