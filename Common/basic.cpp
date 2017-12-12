@@ -44,6 +44,15 @@ namespace MyProxy {
 			return false;
 		}
 	}
+	void SessionManager::clear()
+	{
+		std::unique_lock<std::shared_mutex> lokcer{ sessionsMutex };
+		for (auto &iter : m_sessions) {
+			iter.second->setRunning(false);
+			iter.second->stop();
+		}
+		m_sessions.clear();
+	}
 	void SessionManager::setNotified(SessionId id)
 	{
 		std::unique_lock<std::shared_mutex> locker{ destroyeNotifiedSessionsMutex };
@@ -73,6 +82,8 @@ namespace MyProxy {
 	}
 	void BasicProxyTunnel::write(std::shared_ptr<DataVec> dataPtr)
 	{
+		if (!_running.load())
+			return;
 		m_writeStrand.post([this, dataPtr = std::move(dataPtr), self = shared_from_this()]{
 			if (!_running.load()) {
 				m_logger->warn("BasicProxyTunnel::write() failed: Tunnel not running");
@@ -102,15 +113,10 @@ namespace MyProxy {
 			onDisconnected();
 		}
 		std::function<void()> destroy = [this, self = shared_from_this()] {
-			size_t destroyCount = 0;
-			for (auto &session : m_manager.m_sessions) {
-				session.second->stop();
-				++destroyCount;
-			}
-			m_manager.m_sessions.clear();
-			if (_running.load()) {
-				disconnect();
-			}
+			m_manager.clear();
+			//if (_running.load()) {
+			//	disconnect();
+			//}
 			boost::system::error_code ec;
 			connection().close(ec);
 			if (ec) {

@@ -3,6 +3,9 @@
 #include "abstractproxysession.h"
 #include <chrono>
 #include <unordered_map>
+#include <mutex>
+#include <shared_mutex>
+#include <thread>
 
 namespace MyProxy {
 
@@ -13,36 +16,45 @@ namespace MyProxy {
 			template<typename Protocol>
 			struct CacheRecord {
 				using IteratorType = typename Protocol::resolver::iterator;
+				//end of the endpoints list
 				static const IteratorType end;
 				IteratorType it;
 				std::chrono::time_point<std::chrono::system_clock> expireTime;
-				CacheRecord(const IteratorType &it, std::string host, std::string service, std::chrono::duration<int> expire = std::chrono::minutes(10)) :
-					it(IteratorType::create(it, IteratorType(), host, service)),
-					expireTime(std::chrono::system_clock::now() + expire) {	}
 				bool expired() {
 					return std::chrono::system_clock::now() > expireTime;
 				}
+				CacheRecord(const IteratorType &it, std::string host, std::string service, std::chrono::duration<int> expire = std::chrono::minutes(10)) :
+					it(IteratorType::create(it, IteratorType(), host, service)),
+					expireTime(std::chrono::system_clock::now() + expire) {	}
 			};
+			//the std::unordered_map _resolveCache type
 			template<typename Protocol>
 			using CacheMapType = typename std::unordered_map<
 				typename Protocol::resolver::query,
-				typename CacheRecord<Protocol>,
-				typename std::function<size_t(const typename Protocol::resolver::query&)>,
-				typename std::function<size_t(const typename Protocol::resolver::query&, const typename Protocol::resolver::query&)>
-			>;
+				std::shared_ptr<CacheRecord<Protocol>>,
+				std::function<size_t(const typename Protocol::resolver::query&)>,
+				std::function<size_t(const typename Protocol::resolver::query&, const typename Protocol::resolver::query&)> >;
+			//determine _resolveCache's iterator valid
+			template <typename Protocol>
+			static const typename ResolveCache::CacheMapType<Protocol>::iterator invalid;
+			//cache record
 			template<typename Protocol>
 			static void cache(const typename Protocol::resolver::query &query, const typename CacheRecord<Protocol>::IteratorType &iter) {
-				resolveCache<Protocol>.insert_or_assign(query, iter);
+				//write lock
+				std::unique_lock<std::shared_mutex> locker(_resolveCacheMutex);
+				//insert or rewrite expired record
+				_resolveCache<Protocol>.insert_or_assign(query, std::make_shared<CacheRecord<Protocol>>(iter, query.host_name(), query.service_name()));
 			}
+			//fetch record's shared_ptr, if not found, return invalid shared_ptr
 			template<typename Protocol>
-			static typename CacheRecord<Protocol>::IteratorType fetch(const typename Protocol::resolver::query &query) {
-				auto iter = resolveCache<Protocol>.find(query);
-				if (iter != resolveCache<Protocol>.end()) {
-					return (*iter).second;
-				}
-				else {
-					return CacheRecord<Protocol>::end;
-				}
+			static std::shared_ptr<CacheRecord<Protocol>> fetch(const typename Protocol::resolver::query &query) {
+				//read lock
+				std::shared_lock<std::shared_mutex> locker(_resolveCacheMutex);
+				auto iter = _resolveCache<Protocol>.find(query);
+				if (iter != invalid<Protocol>)
+					return iter->second;
+				else
+					return std::shared_ptr<CacheRecord<Protocol>>();
 			}
 		private:
 			template<typename Protocol>
@@ -51,18 +63,14 @@ namespace MyProxy {
 			}
 			template<typename Protocol>
 			static size_t queryHasher(const typename Protocol::resolver::query & q) {
-				return std::hash <std::string>{}(q.host_name() + ':' + q.service_name());
+				return std::hash<std::string>{}(q.host_name() + ':' + q.service_name());
 			}
-			static std::shared_mutex resolveCacheMutex;
+			//fetch or cache mutex
+			static std::shared_mutex _resolveCacheMutex;
+			//data member
 			template<typename Protocol>
-			static CacheMapType<Protocol> resolveCache = CacheMapType<Protocol>(0,
-				std::bind(&ResolveCache::queryHasher<Protocol>, this, std::placeholders::_1),
-				std::bind(&ResolveCache::queryEqualTo<Protocol>, this, std::placeholders::_1, std::placeholders::_2)
-				);
+			static ResolveCache::CacheMapType<Protocol> _resolveCache;
 		};
-
-		template<typename Protocol>
-		const typename ResolveCache::CacheRecord<Protocol>::IteratorType ResolveCache::CacheRecord<Protocol>::end = Protocol::resolver::iterator();
 
 		class ServerProxyTunnel : public BasicProxyTunnel {
 		public:
@@ -131,30 +139,10 @@ namespace MyProxy {
 		inline void ServerProxySession<Protocol>::handshakeDest()
 		{
 			using namespace boost::asio;
-			std::string hostStr(_destHost.data(), _destHost.size());
-			using flags = boost::asio::ip::resolver_query_base::flags;
-			auto query = std::make_shared<typename Protocol::resolver::query>
-				(hostStr, std::to_string(_destPort), flags::numeric_service | flags::address_configured);
-			_resolver.async_resolve(*query, 
-				[this, query, hostStr = std::move(hostStr), self = this->shared_from_this()]
-				(const boost::system::error_code &ec, typename Protocol::resolver::iterator it) {
-				if (ec) {
-					if (ec == boost::asio::error::operation_aborted)
-						return;
-					this->logger()->warn("ID: {} Resolve {}:{} failed: {}", this->id(), hostStr, _destPort, ec.message());
-					this->statusNotify(State::Failure);
-					this->destroy();
-					return;
-				}
-				this->logger()->debug("ID: {} destination: {}:{} Resolved", this->id(), hostStr, _destPort);
-				//auto begin = it;
-				//typename Protocol::resolver::iterator end;
-				//while (begin != end) {
-				//	auto entry = *(begin++);
-				//	this->logger()->trace("ID: {} Resolved to: {}:{}", this->id(), entry.endpoint().address().to_string(), entry.endpoint().port());
-				//}
+			//connect method
+			auto do_connect = [this, self = this->shared_from_this()](typename Protocol::resolver::iterator it, std::string hostStr){
 				async_connect(this->socket(), it, [this, hostStr = std::move(hostStr), self]
-					(const boost::system::error_code &ec, typename Protocol::resolver::iterator it) {
+				(const boost::system::error_code &ec, typename Protocol::resolver::iterator it) {
 					if (ec) {
 						if (ec == boost::asio::error::operation_aborted)
 							return;
@@ -164,11 +152,42 @@ namespace MyProxy {
 						return;
 					}
 					auto ep = (*it).endpoint();
-					this->logger()->debug("ID: {} Connect to destination: {}:{} succeed",this->id(), ep.address().to_string(), ep.port());
+					this->logger()->debug("ID: {} Connect to destination: {}:{} succeed", this->id(), ep.address().to_string(), ep.port());
 					this->startForwarding();
 					this->statusNotify(State::Succeeded);
 				});
-			});
+			};
+			std::string hostStr(_destHost.data(), _destHost.size());
+			using flags = boost::asio::ip::resolver_query_base::flags;
+			auto query = std::make_shared<typename Protocol::resolver::query>
+				(hostStr, std::to_string(_destPort), flags::numeric_service | flags::address_configured);
+			//fetch resolve record's shared_ptr
+			auto record = ResolveCache::fetch<Protocol>(*query);
+			//check shared_ptr vaild and expire time
+			if (record && !record->expired()) {
+				this->logger()->debug("ID: {} destination: {}:{} resolved cache fetch succeed.", this->id(), hostStr, _destPort);
+				//use cached record
+				do_connect(record->it, std::move(hostStr));
+				return;
+			}
+			else {
+				//or resolve
+				_resolver.async_resolve(*query,
+					[this, query, hostStr = std::move(hostStr), do_connect, self = this->shared_from_this()]
+				(const boost::system::error_code &ec, typename Protocol::resolver::iterator it) {
+					if (ec) {
+						if (ec == boost::asio::error::operation_aborted)
+							return;
+						this->logger()->warn("ID: {} Resolve {}:{} failed: {}", this->id(), hostStr, _destPort, ec.message());
+						this->statusNotify(State::Failure);
+						this->destroy();
+						return;
+					}
+					ResolveCache::cache<Protocol>(*query, it);
+					this->logger()->debug("ID: {} destination: {}:{} resolved, recored cached.", this->id(), hostStr, _destPort);
+					do_connect(it, std::move(hostStr));
+				});
+			}
 		}
 
 		template<typename Protocol>

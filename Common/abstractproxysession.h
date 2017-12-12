@@ -24,6 +24,12 @@ namespace MyProxy {
 		virtual void stop() override;
 		//destroy session, if !notified, notify peer
 		virtual void destroy(bool notified = false) override;
+		virtual void setRunning(bool running) override {
+			_running.exchange(running);
+		}
+		virtual bool running() override {
+			return _running.load(); // ???
+		}
 	protected:
 		//Read socket and write to tunnel.
 		virtual void startForwarding();

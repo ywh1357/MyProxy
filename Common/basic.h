@@ -22,11 +22,11 @@ namespace MyProxy {
 	class BasicProxySession;
 
 	class SessionManager {
-		friend class BasicProxyTunnel;
 	public:
 		std::shared_ptr<BasicProxySession> get(SessionId id);
 		bool insertAndStart(std::shared_ptr<BasicProxySession> session);
 		bool remove(SessionId id);
+		void clear();
 		void setNotified(SessionId id);
 		bool checkNotified(SessionId id);
 	private:
@@ -113,7 +113,10 @@ namespace MyProxy {
 		virtual void start() = 0;
 		virtual void stop() = 0;
 		//destroy session, if !notified, notify peer
-		virtual void destroy(bool notified) = 0;
+		virtual void destroy(bool notified = false) = 0;
+		virtual void setRunning(bool running) = 0;
+		// *** unsafe
+		virtual bool running() = 0;
 		virtual void setTunnel(std::shared_ptr<BasicProxyTunnel> tunnel) { 
 			if (!tunnel) {
 				throw std::runtime_error("BasicProxySession::setTunnel(): parameter: tunnel(std::shared_ptr<BasicProxyTunnel>) unavailable");
