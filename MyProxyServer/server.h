@@ -1,10 +1,68 @@
 #pragma once
 #include "basic.h"
 #include "abstractproxysession.h"
+#include <chrono>
+#include <unordered_map>
 
 namespace MyProxy {
 
 	namespace Server {
+
+		class ResolveCache {
+		public:
+			template<typename Protocol>
+			struct CacheRecord {
+				using IteratorType = typename Protocol::resolver::iterator;
+				static const IteratorType end;
+				IteratorType it;
+				std::chrono::time_point<std::chrono::system_clock> expireTime;
+				CacheRecord(const IteratorType &it, std::string host, std::string service, std::chrono::duration<int> expire = std::chrono::minutes(10)) :
+					it(IteratorType::create(it, IteratorType(), host, service)),
+					expireTime(std::chrono::system_clock::now() + expire) {	}
+				bool expired() {
+					return std::chrono::system_clock::now() > expireTime;
+				}
+			};
+			template<typename Protocol>
+			using CacheMapType = typename std::unordered_map<
+				typename Protocol::resolver::query,
+				typename CacheRecord<Protocol>,
+				typename std::function<size_t(const typename Protocol::resolver::query&)>,
+				typename std::function<size_t(const typename Protocol::resolver::query&, const typename Protocol::resolver::query&)>
+			>;
+			template<typename Protocol>
+			static void cache(const typename Protocol::resolver::query &query, const typename CacheRecord<Protocol>::IteratorType &iter) {
+				resolveCache<Protocol>.insert_or_assign(query, iter);
+			}
+			template<typename Protocol>
+			static typename CacheRecord<Protocol>::IteratorType fetch(const typename Protocol::resolver::query &query) {
+				auto iter = resolveCache<Protocol>.find(query);
+				if (iter != resolveCache<Protocol>.end()) {
+					return (*iter).second;
+				}
+				else {
+					return CacheRecord<Protocol>::end;
+				}
+			}
+		private:
+			template<typename Protocol>
+			static bool queryEqualTo(const typename Protocol::resolver::query & l, const typename Protocol::resolver::query & r) {
+				return l.host_name() == r.host_name() && l.service_name() == r.service_name();
+			}
+			template<typename Protocol>
+			static size_t queryHasher(const typename Protocol::resolver::query & q) {
+				return std::hash <std::string>{}(q.host_name() + ':' + q.service_name());
+			}
+			static std::shared_mutex resolveCacheMutex;
+			template<typename Protocol>
+			static CacheMapType<Protocol> resolveCache = CacheMapType<Protocol>(0,
+				std::bind(&ResolveCache::queryHasher<Protocol>, this, std::placeholders::_1),
+				std::bind(&ResolveCache::queryEqualTo<Protocol>, this, std::placeholders::_1, std::placeholders::_2)
+				);
+		};
+
+		template<typename Protocol>
+		const typename ResolveCache::CacheRecord<Protocol>::IteratorType ResolveCache::CacheRecord<Protocol>::end = Protocol::resolver::iterator();
 
 		class ServerProxyTunnel : public BasicProxyTunnel {
 		public:
@@ -134,13 +192,9 @@ namespace MyProxy {
 		private:
 			boost::asio::io_service::work m_work;
 			std::shared_ptr<boost::asio::ip::tcp::acceptor> m_tcpAcceptor;
-			//std::string m_bindAddress;
-			//std::string m_bindPort;
-			//SessionId m_maxSessionId = 0;
 			std::shared_ptr<ServerProxyTunnel> m_tunnel;
 			Logger m_logger = spdlog::stdout_color_mt("Server");
 			boost::asio::ssl::context m_ctx{ boost::asio::ssl::context::tlsv12_server };
 		};
-		
 	}
 }
