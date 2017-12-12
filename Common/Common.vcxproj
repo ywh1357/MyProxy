@@ -134,6 +134,7 @@
   <ItemGroup>
     <ClInclude Include="abstractproxysession.h" />
     <ClInclude Include="basic.h" />
+    <ClInclude Include="define.h" />
     <ClInclude Include="iohelper.h" />
     <ClInclude Include="sslsetting.h" />
   </ItemGroup>
@@ -141,6 +142,7 @@
     <ClCompile Include="abstractproxysession.cpp" />
     <ClCompile Include="basic.cpp" />
     <ClCompile Include="iohelper.cpp" />
+    <ClCompile Include="packages.cpp" />
     <ClCompile Include="sslsetting.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -17,7 +17,7 @@ int main() {
 
 	MyProxy::Local::Local local(io);
 	local.bind("1083");
-	local.setServer("home.ywh1357.com", "10840");
+	local.setServer("45.76.53.20", "1084");
 	local.setCert("clientcert.pem");
 	local.setKey("clientkey.pem");
 	local.start();

@@ -54,7 +54,7 @@ namespace MyProxy {
 		ios.write(value.data(), value.size());
 	}
 	template<>
-	void IoHelper::read<std::vector<char>>(std::vector<char> & value, size_t bytes)
+	void IoHelper::read<std::vector<char>>(std::vector<char> & value, size_t)
 	{
 		ios.read(value.data(), value.size());
 	}

@@ -139,10 +139,10 @@ namespace MyProxy {
 		if (convert && std::is_integral<T>::value) {
 			T temp = value;
 			temp = boost::endian::native_to_big(temp);
-			ios.write(reinterpret_cast<const char*>(&temp), sizeof(T));
+			ios.write(reinterpret_cast<const char*>(&temp), bytes);
 		}
 		else {
-			ios.write(reinterpret_cast<const char*>(&value), sizeof(T));
+			ios.write(reinterpret_cast<const char*>(&value), bytes);
 		}
 	}
 
@@ -200,7 +200,7 @@ namespace MyProxy {
 	template<>
 	void IoHelper::write<std::vector<char>>(const std::vector<char> & value, size_t);
 	template<>
-	void IoHelper::read<std::vector<char>>(std::vector<char> & value, size_t bytes);
+	void IoHelper::read<std::vector<char>>(std::vector<char> & value, size_t);
 	template <>
 	std::vector<char> IoHelper::getValue<std::vector<char>>(size_t count);
 
