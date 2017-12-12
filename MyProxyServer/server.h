@@ -28,8 +28,7 @@ namespace MyProxy {
 				typename Protocol::resolver::query,
 				typename CacheRecord<Protocol>,
 				typename std::function<typename size_t(const typename Protocol::resolver::query&)>,
-				typename std::function<typename size_t(const typename Protocol::resolver::query&, const typename Protocol::resolver::query&)>
-			>;
+				typename std::function<typename size_t(const typename Protocol::resolver::query&, const typename Protocol::resolver::query&)>>;
 			template <typename Protocol>
 			static const typename CacheMapType<Protocol>::iterator Unavailable;
 			template<typename Protocol>
