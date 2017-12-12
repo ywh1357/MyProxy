@@ -44,6 +44,15 @@ namespace MyProxy {
 			return false;
 		}
 	}
+	void SessionManager::clear()
+	{
+		std::unique_lock<std::shared_mutex> lokcer{ sessionsMutex };
+		for (auto &iter : m_sessions) {
+			iter.second->setRunning(false);
+			iter.second->stop();
+		}
+		m_sessions.clear();
+	}
 	void SessionManager::setNotified(SessionId id)
 	{
 		std::unique_lock<std::shared_mutex> locker{ destroyeNotifiedSessionsMutex };
@@ -104,13 +113,10 @@ namespace MyProxy {
 			onDisconnected();
 		}
 		std::function<void()> destroy = [this, self = shared_from_this()] {
-			for (auto &session : m_manager.m_sessions) {
-				session.second->destroy(true);
-			}
-			m_manager.m_sessions.clear();
-			if (_running.load()) {
-				disconnect();
-			}
+			m_manager.clear();
+			//if (_running.load()) {
+			//	disconnect();
+			//}
 			boost::system::error_code ec;
 			connection().close(ec);
 			if (ec) {
