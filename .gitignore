@@ -7,6 +7,13 @@
 *.userosscache
 *.sln.docstates
 .ssh/
+*.pem
+cacert.pem
+clientcert.pem
+clientkey.pem
+servercert.pem
+serverkey.pem
+
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
