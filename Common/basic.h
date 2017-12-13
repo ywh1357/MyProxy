@@ -115,6 +115,7 @@ namespace MyProxy {
 		//destroy session, if !notified, notify peer
 		virtual void destroy(bool notified = false) = 0;
 		virtual void setRunning(bool running) = 0;
+		// *** unsafe
 		virtual bool running() = 0;
 		virtual void setTunnel(std::shared_ptr<BasicProxyTunnel> tunnel) { 
 			if (!tunnel) {

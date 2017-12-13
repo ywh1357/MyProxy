@@ -11,7 +11,7 @@ namespace MyProxy {
 		const typename ResolveCache::CacheRecord<Protocol>::IteratorType ResolveCache::CacheRecord<Protocol>::end = typename Protocol::resolver::iterator();
 
 		template <typename Protocol>
-		const typename ResolveCache::CacheMapType<Protocol>::iterator ResolveCache::Unavailable = typename ResolveCache::CacheMapType<Protocol>::iterator();
+		const typename ResolveCache::CacheMapType<Protocol>::iterator ResolveCache::invalid = typename ResolveCache::CacheMapType<Protocol>::iterator();
 
 		template<typename Protocol>
 		typename ResolveCache::CacheMapType<Protocol> ResolveCache::_resolveCache = typename ResolveCache::CacheMapType<Protocol>(0,
