@@ -13,6 +13,7 @@ clientcert.pem
 clientkey.pem
 servercert.pem
 serverkey.pem
+*.o
 
 
 # User-specific files (MonoDevelop/Xamarin Studio)
