@@ -10,7 +10,6 @@
 #include <botan/certstor.h>
 #include <botan/x509_ca.h>
 #include <botan/credentials_manager.h>
-#include <botan/rsa.h>
 
 namespace MyProxy {
 
@@ -90,10 +89,10 @@ namespace MyProxy {
 	public:
 		//channel: Client or Server, io: io_service
 		AbstractProxyTunnel(std::shared_ptr<Botan::TLS::Channel> channel, boost::asio::io_service &io, std::string loggerName = "AbstractProxyTunnel") :
-			BasicProxyTunnel(io, loggerName),_channel(channel) {}
+			BasicProxyTunnel(io, loggerName),_channel(channel),_readStrand(io){}
 		virtual void write(std::shared_ptr<DataVec> dataPtr) override;
 	protected:
-		virtual void onReceived(const boost::system::error_code &ec, size_t bytes) override;
+		virtual void onReceived(const boost::system::error_code & ec, size_t bytes, std::shared_ptr<BasicProxyTunnel> self) override;
 		virtual void handleRead(std::shared_ptr<DataVec> data) override = 0;
 		virtual void tls_emit_data(const uint8_t data[], size_t size) override;
 		virtual void tls_record_received(uint64_t seq_no, const uint8_t data[], size_t size) override;
@@ -103,6 +102,7 @@ namespace MyProxy {
 		virtual bool tls_session_established(const Botan::TLS::Session& session) override;
 	private:
 		boost::asio::streambuf _readBuffer2;
+		boost::asio::strand _readStrand;
 		std::shared_ptr<Botan::TLS::Channel> _channel;
 	};
 
@@ -111,9 +111,16 @@ namespace MyProxy {
 		_channel->send(reinterpret_cast<unsigned char*>(dataPtr->data()),dataPtr->size());
 	}
 
-	inline void AbstractProxyTunnel::onReceived(const boost::system::error_code & ec, size_t bytes)
+	inline void AbstractProxyTunnel::onReceived(const boost::system::error_code & ec, size_t bytes, std::shared_ptr<BasicProxyTunnel> self)
 	{
-		_channel->received_data(boost::asio::buffer_cast<const unsigned char*>(_readBuffer2.data()), bytes);
+		if (ec) {
+			logger()->error("AbstractProxyTunnel::onReceived() error: {}", ec.message());
+			_channel->close();
+			disconnect();
+			return;
+		}
+		_channel->received_data(boost::asio::buffer_cast<const unsigned char*>(readbuf().data()), bytes);
+		readbuf().consume(bytes);
 		nextRead();
 	}
 }

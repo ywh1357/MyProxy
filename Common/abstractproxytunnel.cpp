@@ -35,7 +35,7 @@ namespace MyProxy {
 	{
 		// handle a tls alert received from the tls server
 		auto vec = alert.serialize();
-		logger()->error(std::string{ vec.begin(), vec.end() });
+		logger()->error("Alert: {}", std::string{ vec.begin(), vec.end() });
 	}
 	bool AbstractProxyTunnel::tls_session_established(const Botan::TLS::Session & session)
 	{

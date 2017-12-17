@@ -161,8 +161,8 @@ namespace MyProxy {
 	{
 		using namespace boost::asio;
 		_connection.async_read_some(
-			m_readBuffer.prepare(8 * 1024), 
-			std::bind(&BasicProxyTunnel::onReceived,this,std::placeholders::_1,std::placeholders::_2)
+			m_readBuffer.prepare(8 * 1024),
+			std::bind(&BasicProxyTunnel::onReceived, this, std::placeholders::_1, std::placeholders::_2, shared_from_this())
 		);
 	}
 

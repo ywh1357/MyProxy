@@ -81,7 +81,7 @@ namespace MyProxy {
 	protected:
 		std::atomic<bool> _running{ true };
 		std::atomic<bool> _handshakeFinished{ false };
-		virtual void onReceived(const boost::system::error_code &ec, size_t bytes) = 0;
+		virtual void onReceived(const boost::system::error_code & ec, size_t bytes, std::shared_ptr<BasicProxyTunnel> self) = 0;
 	private:
 		boost::asio::io_service &io;
 		boost::asio::ip::tcp::socket _connection;
