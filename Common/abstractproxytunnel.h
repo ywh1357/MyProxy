@@ -16,7 +16,7 @@ namespace MyProxy {
 	class Credentials : public Botan::Credentials_Manager
 	{
 	public:
-		Credentials(std::shared_ptr<Botan::RandomNumberGenerator> rng = std::make_shared<Botan::AutoSeeded_RNG>()):_rng(rng) {}
+		Credentials(Botan::RandomNumberGenerator & rng):_rng(rng) {}
 		//callback
 		std::vector<Botan::Certificate_Store*> trusted_certificate_authorities(
 			const std::string& type,
@@ -26,7 +26,7 @@ namespace MyProxy {
 			// shall return a list of certificates of CAs we trust
 			// for tls client certificates, otherwise return an empty list
 			//return std::vector<Botan::Certificate_Store*>();
-			return { new Botan::Certificate_Store_In_Memory(_caStore) };
+			return { new Botan::Certificate_Store_In_Memory(cas()) };
 		}
 		//callback
 		std::vector<Botan::X509_Certificate> cert_chain(
@@ -55,7 +55,7 @@ namespace MyProxy {
 		void addPair(const std::string& certPath, const std::string& keyPath) {
 			std::unique_lock<std::shared_mutex> locker(_mutex);
 			Botan::X509_Certificate cert(certPath);
-			std::shared_ptr<Botan::Private_Key> key(Botan::PKCS8::load_key(keyPath, *_rng));
+			std::shared_ptr<Botan::Private_Key> key(Botan::PKCS8::load_key(keyPath, _rng));
 			_certs.insert(cert);
 			pairs.insert_or_assign(std::move(cert), key);
 		}
@@ -82,10 +82,10 @@ namespace MyProxy {
 		std::map<Botan::X509_Certificate, std::shared_ptr<Botan::Private_Key>> pairs;
 		std::set<Botan::X509_Certificate> _certs;
 		std::shared_mutex _mutex;
-		std::shared_ptr<Botan::RandomNumberGenerator> _rng;
+		Botan::RandomNumberGenerator & _rng;
 	};
 
-	class AbstractProxyTunnel : public BasicProxyTunnel, protected Botan::TLS::Callbacks {
+	class AbstractProxyTunnel : public BasicProxyTunnel, public Botan::TLS::Callbacks {
 	public:
 		//channel: Client or Server, io: io_service
 		AbstractProxyTunnel(std::shared_ptr<Botan::TLS::Channel> channel, boost::asio::io_service &io, std::string loggerName = "AbstractProxyTunnel") :

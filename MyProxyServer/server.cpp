@@ -70,7 +70,6 @@ namespace MyProxy {
 
 		Server::Server(boost::asio::io_service &io):m_work(io)
 		{
-			m_ctx.set_verify_mode(m_ctx.verify_client_once | m_ctx.verify_peer | m_ctx.verify_fail_if_no_peer_cert);
 		}
 
 		Server::~Server()
@@ -80,17 +79,12 @@ namespace MyProxy {
 
 		void Server::setCA(std::string path)
 		{
-			m_ctx.load_verify_file(path);
+			_creds.addCA(path);
 		}
 
-		void Server::setCert(std::string path)
+		void Server::setCertAndKey(std::string certPath, std::string keyPath)
 		{
-			m_ctx.use_certificate_file(path, m_ctx.pem);
-		}
-
-		void Server::setKey(std::string path)
-		{
-			m_ctx.use_private_key_file(path, m_ctx.pem);
+			_creds.addPair(certPath, keyPath);
 		}
 
 		void Server::bind(std::string port, std::string bindAddress)
@@ -114,7 +108,7 @@ namespace MyProxy {
 
 		void Server::startAccept()
 		{
-			auto tunnel = std::make_shared<ServerProxyTunnel>(m_work.get_io_service(), m_ctx);
+			auto tunnel = std::make_shared<ServerProxyTunnel>(_sessionMgr, _creds, _policy, _rng, m_work.get_io_service());
 			//tunnel->onDisconnected = std::bind(&Server::startAccept, this);
 			m_logger->info("Start accept");
 			m_tcpAcceptor->async_accept(tunnel->connection(), [this, tunnel](const boost::system::error_code &ec) {

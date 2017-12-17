@@ -7,9 +7,6 @@
 #include <mutex>
 #include <shared_mutex>
 #include <thread>
-#include <botan/credentials_manager.h>
-#include <botan/certstor.h>
-#include <botan/tls_client.h>
 #include <botan/tls_server.h>
 
 namespace MyProxy {
@@ -215,8 +212,7 @@ namespace MyProxy {
 			Server(boost::asio::io_service &io);
 			~Server();
 			void setCA(std::string path);
-			void setCert(std::string path);
-			void setKey(std::string path);
+			void setCertAndKey(std::string certPath,std::string keyPath);
 			void bind(std::string port, std::string bindAddress = std::string());
 			void start();
 		private:
@@ -224,9 +220,12 @@ namespace MyProxy {
 		private:
 			boost::asio::io_service::work m_work;
 			std::shared_ptr<boost::asio::ip::tcp::acceptor> m_tcpAcceptor;
-			std::shared_ptr<ServerProxyTunnel> m_tunnel;
+			//std::shared_ptr<ServerProxyTunnel> m_tunnel;
+			Botan::AutoSeeded_RNG _rng;
+			Credentials _creds{ _rng };
+			Botan::TLS::Session_Manager_In_Memory _sessionMgr{ _rng };
+			Botan::TLS::Strict_Policy _policy;
 			Logger m_logger = spdlog::stdout_color_mt("Server");
-			boost::asio::ssl::context m_ctx{ boost::asio::ssl::context::tlsv12_server };
 		};
 	}
 }
