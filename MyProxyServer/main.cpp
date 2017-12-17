@@ -17,8 +17,8 @@ int main() {
 
 	MyProxy::Server::Server server(io);
 	server.bind("1084");
-	server.setCA("cacert.pem");
-	server.setCertAndKey("servercert.pem", "serverkey.pem");
+	server.setCA("E:\\pki\\cacert.pem");
+	server.setCertAndKey("E:\\pki\\servercert.pem", "E:\\pki\\serverkey.pkcs8.pem"); //openssl pkcs8 -topk8 -in .\serverkey.pem -nocrypt -out serverkey.pkcs8.pem
 	server.start();
 
 	auto threadLogger = spdlog::stdout_logger_mt("IO Thread");

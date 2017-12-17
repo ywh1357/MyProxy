@@ -10,6 +10,7 @@
 #include <botan/certstor.h>
 #include <botan/x509_ca.h>
 #include <botan/credentials_manager.h>
+#include <botan/rsa.h>
 
 namespace MyProxy {
 
@@ -55,7 +56,7 @@ namespace MyProxy {
 		void addPair(const std::string& certPath, const std::string& keyPath) {
 			std::unique_lock<std::shared_mutex> locker(_mutex);
 			Botan::X509_Certificate cert(certPath);
-			std::shared_ptr<Botan::Private_Key> key(Botan::PKCS8::load_key(keyPath, _rng));
+			std::shared_ptr<Botan::Private_Key> key(Botan::PKCS8::load_key(keyPath,_rng));
 			_certs.insert(cert);
 			pairs.insert_or_assign(std::move(cert), key);
 		}
