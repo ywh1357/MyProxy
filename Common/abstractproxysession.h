@@ -11,7 +11,6 @@ namespace MyProxy {
 	{
 	public:
 		struct TraitsProtoType;
-
 		AbstractProxySession(SessionId id, boost::asio::io_service &io, std::string loggerName = "Session") :
 			BasicProxySession(id,io, loggerName),
 			m_socket(io), m_writeStrand(io) {}

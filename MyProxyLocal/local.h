@@ -77,7 +77,7 @@ namespace MyProxy {
 					auto[ver, num] = io.getTuple<ProtoVer, size_t>(_1B, _1B);
 					if (ver != ProtoVer::Socket5) {
 						this->logger()->error("Session ID: {} unsupported version: 0x{:x}", this->id(),static_cast<uint8_t>(ver));
-						this->destroy(); //error unsupport
+						this->destroy(true); //error unsupport
 						return;
 					}
 					DataVec authMethodList(num);
@@ -94,7 +94,7 @@ namespace MyProxy {
 						async_write(this->socket(), buffer(*rsp), transfer_all(), [this, rsp, self](const boost::system::error_code &ec, size_t bytes) {
 							if (ec) {
 								this->logger()->error("Session ID: {} response write error: {}", this->id(),ec.message());
-								this->destroy(); //error
+								this->destroy(true); //error
 								return;
 							}
 							this->handshakeTunnel();
@@ -102,13 +102,13 @@ namespace MyProxy {
 					}
 					else {
 						this->logger()->error("Session ID: {} unsupported method", this->id());
-						this->destroy(); //error unsupport
+						this->destroy(true); //error unsupport
 						return;
 					}
 				}
 				else {
 					this->logger()->error("Session ID: {} handshakeLocal() error", this->id(), ec.message());
-					this->destroy();
+					this->destroy(true);
 				}
 			});
 		}
@@ -156,7 +156,7 @@ namespace MyProxy {
 						break;
 					default:
 						this->logger()->error("Session ID: {} unsupported request type {}", this->id(), ec.message(), _reqType);
-						this->destroy(); //error unsupport
+						this->destroy(true); //error unsupport
 						return;
 						break;
 					}
@@ -173,7 +173,7 @@ namespace MyProxy {
 						break;
 					default:
 						this->logger()->error("Session ID: {} unknown address type {}", this->id(), ec.message(), _addrType);
-						this->destroy(); //error
+						this->destroy(true); //error
 						break;
 					}
 					_destHost.resize(hostSize);
@@ -186,7 +186,7 @@ namespace MyProxy {
 				}
 				else {
 					this->logger()->error("Session ID: {} handshakeTunnel() error {}", this->id(), ec.message());
-					this->destroy();
+					this->destroy(true);
 				}
 			});
 		}
@@ -223,7 +223,7 @@ namespace MyProxy {
 			}
 			else {
 				this->logger()->debug("Session ID: {} handshake state failed {}", this->id(), _state);
-				this->destroy();
+				this->destroy(true);
 			}
 			//write() must call after startForwarding(),otherwise _running not be set to true, should fix it.
 			this->write(std::make_shared<DataVec>(std::move(buf))); 

@@ -1,11 +1,16 @@
 #pragma once
 #include "basic.h"
 #include "abstractproxysession.h"
+#include "abstractproxytunnel.h"
 #include <chrono>
 #include <unordered_map>
 #include <mutex>
 #include <shared_mutex>
 #include <thread>
+#include <botan/credentials_manager.h>
+#include <botan/certstor.h>
+#include <botan/tls_client.h>
+#include <botan/tls_server.h>
 
 namespace MyProxy {
 
@@ -34,7 +39,7 @@ namespace MyProxy {
 				std::shared_ptr<CacheRecord<Protocol>>,
 				std::function<size_t(const typename Protocol::resolver::query&)>,
 				std::function<size_t(const typename Protocol::resolver::query&, const typename Protocol::resolver::query&)> >;
-			//determine _resolveCache's iterator valid
+			//determine _resolveCache's iterator invalid
 			template <typename Protocol>
 			static const typename ResolveCache::CacheMapType<Protocol>::iterator invalid;
 			//cache record
@@ -42,7 +47,7 @@ namespace MyProxy {
 			static void cache(const typename Protocol::resolver::query &query, const typename CacheRecord<Protocol>::IteratorType &iter) {
 				//write lock
 				std::unique_lock<std::shared_mutex> locker(_resolveCacheMutex);
-				//insert or rewrite expired record
+				//insert record or rewrite the expired record
 				_resolveCache<Protocol>.insert_or_assign(query, std::make_shared<CacheRecord<Protocol>>(iter, query.host_name(), query.service_name()));
 			}
 			//fetch record's shared_ptr, if not found, return invalid shared_ptr
@@ -72,20 +77,28 @@ namespace MyProxy {
 			static ResolveCache::CacheMapType<Protocol> _resolveCache;
 		};
 
-		class ServerProxyTunnel : public BasicProxyTunnel {
+		class ServerProxyTunnel : public AbstractProxyTunnel {
 		public:
-			ServerProxyTunnel(boost::asio::io_service &io, boost::asio::ssl::context &ctx) :BasicProxyTunnel(io, ctx, "ServerProxyTunnel") {
+			ServerProxyTunnel(Botan::TLS::Session_Manager & sessionManager, 
+				Credentials & creds, const Botan::TLS::Policy & policy, 
+				Botan::RandomNumberGenerator & rng, boost::asio::io_service & io):
+				AbstractProxyTunnel(
+					std::make_shared<Botan::TLS::Server>(*this, sessionManager, creds, policy, rng),
+					io, "ServerProxyTunnel"
+				) 
+			{
 			}
 			~ServerProxyTunnel() {
 				//logger()->debug("destroyed");
 			}
 			virtual void start() override {
-				logger()->debug("Server Tunnel start handshake");
-				handshake();
+				logger()->debug("Server Tunnel start");
+				nextRead();
 			}
-			virtual void handshake() override;
 		protected:
-			virtual void handleRead(const boost::system::error_code &ec, size_t bytes, std::shared_ptr<BasicProxyTunnel>) override;
+			virtual void handleRead(std::shared_ptr<DataVec> data) override;
+		private:
+
 		};
 
 		template <typename Protocol>
@@ -148,7 +161,7 @@ namespace MyProxy {
 							return;
 						this->logger()->warn("ID: {} Connect to destination: {}:{} failed: {}", this->id(), hostStr, _destPort, ec.message());
 						this->statusNotify(State::Failure);
-						this->destroy();
+						this->destroy(true);
 						return;
 					}
 					auto ep = (*it).endpoint();
@@ -180,7 +193,7 @@ namespace MyProxy {
 							return;
 						this->logger()->warn("ID: {} Resolve {}:{} failed: {}", this->id(), hostStr, _destPort, ec.message());
 						this->statusNotify(State::Failure);
-						this->destroy();
+						this->destroy(true);
 						return;
 					}
 					ResolveCache::cache<Protocol>(*query, it);

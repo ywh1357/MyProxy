@@ -26,6 +26,9 @@ namespace MyProxy {
 			IoHelper(vec).putCastedValues<uint8_t, SizeType>(type, size());
 			return vec;
 		}
+		static size_t getSize(const char* buf) {
+			return *reinterpret_cast<const SizeType*>(buf + 1);
+		}
 		static size_t remainBytes(const char* buf, size_t bytes, bool convert = false) {
 			if (bytes < sizeof(Type) + sizeof(SizeType)) {
 				return sizeof(Type) + sizeof(SizeType) - bytes;

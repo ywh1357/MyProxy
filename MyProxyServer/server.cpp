@@ -19,46 +19,23 @@ namespace MyProxy {
 			std::bind(&ResolveCache::queryEqualTo<Protocol>, std::placeholders::_1, std::placeholders::_2)
 			);
 
-		void ServerProxyTunnel::handshake()
+		void ServerProxyTunnel::handleRead(std::shared_ptr<DataVec> data)
 		{
-			socket().async_handshake(ssl::stream_base::server, [this, self = shared_from_this()](const boost::system::error_code &ec){
-				if (ec) {
-					logger()->error("handshake() error: {}", ec.message());
-					disconnect();
-					return;
-				}
-				logger()->debug("handshake success");
-				startProcess();
-			});
-		}
-		void ServerProxyTunnel::handleRead(const boost::system::error_code & ec, size_t bytes, std::shared_ptr<BasicProxyTunnel> self)
-		{
-			if (ec) {
-				logger()->error("handleRead() error: {}", ec.message());
-				disconnect();
-				return;
-			}
-			if (bytes == 0) {
-				logger()->warn("handleRead() error: read zero bytes");
-				nextRead();
-				return;
-			}
 			if (!_running.load()) {
 				logger()->warn("handleRead() cancel: tunnel stoped");
 				return;
 			}
-			auto data = buffer_cast<const char*>(readbuf().data());
-			auto type = static_cast<Package::Type>(data[0]);
+			auto type = static_cast<Package::Type>(data->at(0));
 			if (type == Package::Type::Session) {
 				auto package = std::make_shared<SessionPackage>();
-				IoHelper(&readbuf()) >> *package;
+				IoHelper(*data) >> *package;
 				dispatch(package);
 			}
 			else if (type == Package::Type::Tunnel) {
-				TunnelMethod method = TunnelPackage::getTunnelMethod(buffer_cast<const char*>(readbuf().data()));
+				TunnelMethod method = TunnelPackage::getTunnelMethod(data->data());
 				if (method == TunnelMethod::NewSession) {
 					NewSessionRequest request;
-					IoHelper(&readbuf()) >> request;
+					IoHelper(*data) >> request;
 					logger()->debug("NewSessionRequest received ID: {}", request.id);
 					std::shared_ptr<BasicProxySession> session;
 					if (request.protoType == ProtoType::Tcp) {
@@ -72,7 +49,7 @@ namespace MyProxy {
 				}
 				else if (method == TunnelMethod::SessionDestroy) {
 					SessionId sessionId;
-					std::tie(std::ignore, std::ignore, std::ignore, sessionId) = IoHelper(&readbuf()).getTuple<Package::Type, Package::SizeType, TunnelMethod, SessionId>(_1B, _4B, _1B, _4B);
+					std::tie(std::ignore, std::ignore, std::ignore, sessionId) = IoHelper(*data).getTuple<Package::Type, Package::SizeType, TunnelMethod, SessionId>(_1B, _4B, _1B, _4B);
 					auto session = manager().get(sessionId);
 					if (session)
 						session->destroy(true);
@@ -89,8 +66,6 @@ namespace MyProxy {
 				disconnect();
 				return;
 			}
-			nextRead();
-			unused(self);
 		}
 
 		Server::Server(boost::asio::io_service &io):m_work(io)
