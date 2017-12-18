@@ -17,10 +17,10 @@ namespace MyProxy {
 		}
 		void LocalProxyTunnel::handleRead(std::shared_ptr<DataVec> data)
 		{
-			if (!_running.load()) {
-				logger()->warn("handleRead() cancel: tunnel stoped");
-				return;
-			}
+			//if (!_running.load()) {
+			//	logger()->warn("handleRead() cancel: tunnel stoped");
+			//	return;
+			//}
 			auto type = static_cast<Package::Type>(data->at(0));
 			if (type == Package::Type::Session) {
 				auto package = std::make_shared<SessionPackage>();
@@ -52,11 +52,12 @@ namespace MyProxy {
 
 		Local::Local(boost::asio::io_service &io): m_work(io), m_resolver(io), m_timer(io)
 		{
-			auto rng = new Botan::AutoSeeded_RNG;
-			auto mgr = new Botan::TLS::Session_Manager_In_Memory(*rng);
-			auto creds = new Credentials(*rng);
+			auto rng = std::make_unique<Botan::AutoSeeded_RNG>();
+			auto mgr = std::make_unique<Botan::TLS::Session_Manager_In_Memory>(*rng);
+			auto creds = std::make_unique<MyProxy::Credentials>("tls-client", *rng);
+			auto policy = std::make_unique<MyProxy::Policy>();
 			_ctx = std::make_unique<TLSContext>
-				(rng, mgr, creds, new Policy);
+				(std::move(rng), std::move(mgr), std::move(creds), std::move(policy));
 		}
 		Local::~Local()
 		{

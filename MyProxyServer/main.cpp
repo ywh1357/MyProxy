@@ -1,24 +1,45 @@
 #include "server.h"
-#include "sslsetting.h"
+#include "argh.h"
 
-int main() {
+int main(int argc, char* argv[]) {
 
 	using namespace std;
 
-	MyProxy::openssl_config::thread_setup();
+	auto cmdl = argh::parser(argc, argv, argh::parser::NO_SPLIT_ON_EQUALSIGN | argh::parser::PREFER_PARAM_FOR_UNREG_OPTION);
 
 	//spd::set_async_mode(4096);
 	spdlog::set_pattern("[%D %H:%M:%e] [%L] [%t] [%n]\t%v");
-	spdlog::set_level(spdlog::level::debug);
+	spdlog::level::level_enum level;
+	level = cmdl[{"--debug"}] ? spdlog::level::debug : spdlog::level::info;
+	spdlog::set_level(level);
 	//auto f = std::make_shared<spdlog::pattern_formatter>("[%D %H:%M:%e]\t[%L]\t[%n]\t%v");
 	//spdlog::set_formatter(f);
 
 	boost::asio::io_service io;
-
 	MyProxy::Server::Server server(io);
-	server.bind("1084");
-	//server.setCA("E:\\pki\\cacert.pem");
-	server.setCertAndKey("E:\\pki\\servercert.pem", "E:\\pki\\serverkey.pkcs8.pem"); //openssl pkcs8 -topk8 -in .\serverkey.pem -nocrypt -out serverkey.pkcs8.pem
+
+	std::string caPath;
+	if (cmdl("--CA") >> caPath) {
+		server.setCA(caPath);
+	}
+	std::string port, address;
+	address = cmdl(1).str();
+	port = cmdl({ "-p","--port" }, "1080").str() ;
+	server.bind(port, address);
+	std::string cert, key;
+	bool hasCert = false, hasKey = false;
+	if (cmdl("--cert") >> cert)
+		hasCert = true;
+	if (cmdl("--key") >> key)
+		hasKey = true;
+	if (hasCert && hasKey) {
+		server.setCertAndKey(cert, key); //openssl pkcs8 -topk8 -in .\serverkey.pem -nocrypt -out serverkey.pkcs8.pem
+	}
+	else if (hasCert || hasKey) {
+		std::cerr << "Please provide a certificate key pair\n";
+		exit(1);
+	}
+
 	server.start();
 
 	auto threadLogger = spdlog::stdout_logger_mt("IO Thread");
@@ -42,10 +63,6 @@ int main() {
 	for (auto &t : threads) {
 		t.join();
 	}
-
-	MyProxy::openssl_config::thread_cleanup();
-
-	::system("pause");
 
 	return 0;
 

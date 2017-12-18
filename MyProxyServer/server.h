@@ -89,6 +89,7 @@ namespace MyProxy {
 					(*this, *_ctx.session_mgr, *_ctx.creds, *_ctx.policy, *_ctx.rng);
 				nextRead();
 			}
+			virtual bool tls_session_established(const Botan::TLS::Session& session) override;;
 		protected:
 			virtual void handleRead(std::shared_ptr<DataVec> data) override;
 		private:
@@ -172,7 +173,7 @@ namespace MyProxy {
 			auto record = ResolveCache::fetch<Protocol>(*query);
 			//check shared_ptr vaild and expire time
 			if (record && !record->expired()) {
-				this->logger()->debug("ID: {} destination: {}:{} resolved cache fetch succeed.", this->id(), hostStr, _destPort);
+				this->logger()->debug("ID: {} destination: {}:{} resolve record fetch succeed.", this->id(), hostStr, _destPort);
 				//use cached record
 				do_connect(record->it, std::move(hostStr));
 				return;

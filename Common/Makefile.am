@@ -1,7 +1,7 @@
 lib_LIBRARIES = libmyproxy.a
 #moduledir = $(libdir)
 #module_PROGRAMS = libmyproxy.so
-libmyproxy_a_SOURCES = abstractproxysession.cpp  basic.cpp  iohelper.cpp  packages.cpp  sslsetting.cpp
+libmyproxy_a_SOURCES = abstractproxysession.cpp abstractproxytunnel.cpp  basic.cpp  iohelper.cpp  packages.cpp  sslsetting.cpp
 #libmyproxy_a_LDFLAGS = -all-static
 libmyproxy_a_CXXFLAGS  = -std=c++17 -lboost_system -lssl -lcrypto -lpthread 
 #LIBS = -lssl -lcrypto -lboost_system -lpthread

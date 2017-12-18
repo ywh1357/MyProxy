@@ -44,12 +44,6 @@ namespace MyProxy {
 		BasicProxyTunnel(boost::asio::io_service &io, std::string loggerName = "Tunnel");
 		virtual ~BasicProxyTunnel();
 		virtual void start() = 0;
-		std::shared_ptr<BasicProxyTunnel> self() {
-			return shared_from_this();
-		}
-		inline bool ready() {
-			return _handshakeFinished.load(); //wrong?
-		}
 		SessionManager& manager() {
 			return m_manager;
 		}
@@ -79,7 +73,6 @@ namespace MyProxy {
 		std::function<void()> onDisconnected;
 	protected:
 		std::atomic<bool> _running{ true };
-		std::atomic<bool> _handshakeFinished{ false };
 		virtual void onReceived(const boost::system::error_code & ec, size_t bytes, std::shared_ptr<BasicProxyTunnel> self) = 0;
 	private:
 		boost::asio::io_service &io;

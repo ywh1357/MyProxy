@@ -11,13 +11,10 @@ namespace MyProxy {
 
 	void AbstractProxyTunnel::tls_emit_data(const uint8_t data[], size_t size)
 	{
-		// send data to tls server, e.g., using BSD sockets or boost asio
-		this->write_ex(std::make_shared<DataVec>(DataVec{ data, data + size }));
+		write_ex(std::make_shared<DataVec>(DataVec{ data, data + size }));
 	}
 	void AbstractProxyTunnel::tls_record_received(uint64_t /*seq_no*/, const uint8_t data[], size_t size)
 	{
-		// process full TLS record received by tls server, e.g.,
-		// by passing it to the application
 		IoHelper io(&_readBuffer2);
 		io.write(reinterpret_cast<const char*>(data), size);
 		auto rawData = buffer_cast<const char*>(_readBuffer2.data());
@@ -28,20 +25,59 @@ namespace MyProxy {
 			auto pkgData = std::make_shared<DataVec>(pkgSz);
 			io.read(*pkgData, pkgSz);
 			_readBuffer2.consume(pkgSz);
-			this->handleRead(pkgData);
+			handleRead(pkgData);
 		}
 	}
 	void AbstractProxyTunnel::tls_alert(Botan::TLS::Alert alert)
 	{
-		// handle a tls alert received from the tls server
 		auto vec = alert.serialize();
 		logger()->error("Alert: {}:{}", alert.type_string(),std::string{ vec.begin(), vec.end() });
 	}
 	bool AbstractProxyTunnel::tls_session_established(const Botan::TLS::Session & session)
 	{
-		// the session with the tls server was established
-		// return false to prevent the session from being cached, true to
-		// cache the session in the configured session manager
-		return true;
+		return false;
+	}
+	void AbstractProxyTunnel::write(std::shared_ptr<DataVec> dataPtr)
+	{
+		_writeStrand.post([this, dataPtr, self = shared_from_this()]{
+			try {
+				std::shared_lock<std::shared_mutex> locker(_stateMutex);
+				if (_channel->is_active())
+					_channel->send(reinterpret_cast<const uint8_t*>(dataPtr->data()), dataPtr->size());
+			}
+			catch (const std::exception &ex) {
+				logger()->error("_channel->send() error: {}", ex.what());
+				std::unique_lock<std::shared_mutex> locker(_stateMutex);
+				_channel->close();
+				locker.unlock();
+				disconnect();
+			}
+		});
+	}
+	void AbstractProxyTunnel::onReceived(const boost::system::error_code & ec, size_t bytes, std::shared_ptr<BasicProxyTunnel> self)
+	{
+		if (ec) {
+			logger()->error("AbstractProxyTunnel::onReceived() error: {}", ec.message());
+			std::unique_lock<std::shared_mutex> locker(_stateMutex);
+			if (!_channel->is_closed())
+				_channel->close();
+			locker.unlock();
+			disconnect();
+			return;
+		}
+		try {
+			std::shared_lock<std::shared_mutex> locker(_stateMutex);
+			if (!_channel->is_closed())
+				_channel->received_data(boost::asio::buffer_cast<const uint8_t*>(readbuf().data()), bytes);
+		}
+		catch (const std::exception &ex) {
+			logger()->error("_channel->received_data() error: {}", ex.what());
+			std::unique_lock<std::shared_mutex> locker(_stateMutex);
+			_channel->close();
+			locker.unlock();
+			disconnect();
+		}
+		readbuf().consume(bytes);
+		nextRead();
 	}
 }

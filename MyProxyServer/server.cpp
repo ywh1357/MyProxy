@@ -1,4 +1,5 @@
 #include "server.h"
+#include <botan/x509path.h>
 
 using namespace boost::asio;
 
@@ -19,12 +20,33 @@ namespace MyProxy {
 			std::bind(&ResolveCache::queryEqualTo<Protocol>, std::placeholders::_1, std::placeholders::_2)
 			);
 
+		bool ServerProxyTunnel::tls_session_established(const Botan::TLS::Session & session)
+		{
+			auto cert_chain = session.peer_certs();
+			auto cas = _ctx.creds->trusted_certificate_authorities("tls-server", "");
+			if (cert_chain.empty() && !cas.empty())
+			{
+				channel()->send_fatal_alert(Botan::TLS::Alert::NO_CERTIFICATE);
+				throw std::invalid_argument("Certificate chain was empty");
+			}
+			Botan::Path_Validation_Result result = Botan::x509_path_validate(
+				cert_chain,
+				Botan::Path_Validation_Restrictions(),
+				cas
+			);
+			if (!result.successful_validation()) {
+				channel()->send_fatal_alert(Botan::TLS::Alert::BAD_CERTIFICATE);
+				throw std::exception(result.result_string().c_str());
+			}
+			return true;
+		}
+
 		void ServerProxyTunnel::handleRead(std::shared_ptr<DataVec> data)
 		{
-			if (!_running.load()) {
-				logger()->warn("handleRead() cancel: tunnel stoped");
-				return;
-			}
+			//if (!_running.load()) {
+			//	logger()->warn("handleRead() cancel: tunnel stoped");
+			//	return;
+			//}
 			auto type = static_cast<Package::Type>(data->at(0));
 			if (type == Package::Type::Session) {
 				auto package = std::make_shared<SessionPackage>();
@@ -70,11 +92,12 @@ namespace MyProxy {
 
 		Server::Server(boost::asio::io_service &io):m_work(io)
 		{
-			auto rng = new Botan::AutoSeeded_RNG;
-			auto mgr = new Botan::TLS::Session_Manager_In_Memory(*rng);
-			auto creds = new Credentials(*rng);
+			auto rng = std::make_unique<Botan::AutoSeeded_RNG>();
+			auto mgr = std::make_unique<Botan::TLS::Session_Manager_In_Memory>(*rng);
+			auto creds = std::make_unique<MyProxy::Credentials>("tls-server", *rng);
+			auto policy = std::make_unique<MyProxy::Policy>();
 			_ctx = std::make_unique<TLSContext>
-				(rng, mgr, creds, new Policy);
+				(std::move(rng), std::move(mgr), std::move(creds), std::move(policy));
 		}
 
 		Server::~Server()
