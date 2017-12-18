@@ -77,6 +77,8 @@ namespace MyProxy {
 
 		template <typename T>
 		void write(const T& value, size_t bytes = sizeof(T));
+		template <typename T>
+		void write(const T* ptr, size_t bytes);
 
 		template <typename T>
 		void read(T& value, size_t bytes = sizeof(T));
@@ -144,6 +146,12 @@ namespace MyProxy {
 		else {
 			ios.write(reinterpret_cast<const char*>(&value), bytes);
 		}
+	}
+
+	template<typename T>
+	inline void IoHelper::write(const T * ptr, size_t bytes)
+	{
+		ios.write(ptr, bytes);
 	}
 
 	template<typename T>

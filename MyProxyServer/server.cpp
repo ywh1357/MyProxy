@@ -10,8 +10,8 @@ namespace MyProxy {
 		template<typename Protocol>
 		const typename ResolveCache::CacheRecord<Protocol>::IteratorType ResolveCache::CacheRecord<Protocol>::end = typename Protocol::resolver::iterator();
 
-		template <typename Protocol>
-		const typename ResolveCache::CacheMapType<Protocol>::iterator ResolveCache::invalid = typename ResolveCache::CacheMapType<Protocol>::iterator();
+		//template <typename Protocol>
+		//const typename ResolveCache::CacheMapType<Protocol>::iterator ResolveCache::invalid = typename ResolveCache::CacheMapType<Protocol>::iterator();
 
 		template<typename Protocol>
 		typename ResolveCache::CacheMapType<Protocol> ResolveCache::_resolveCache = typename ResolveCache::CacheMapType<Protocol>(0,
@@ -19,46 +19,23 @@ namespace MyProxy {
 			std::bind(&ResolveCache::queryEqualTo<Protocol>, std::placeholders::_1, std::placeholders::_2)
 			);
 
-		void ServerProxyTunnel::handshake()
+		void ServerProxyTunnel::handleRead(std::shared_ptr<DataVec> data)
 		{
-			socket().async_handshake(ssl::stream_base::server, [this, self = shared_from_this()](const boost::system::error_code &ec){
-				if (ec) {
-					logger()->error("handshake() error: {}", ec.message());
-					disconnect();
-					return;
-				}
-				logger()->debug("handshake success");
-				startProcess();
-			});
-		}
-		void ServerProxyTunnel::handleRead(const boost::system::error_code & ec, size_t bytes, std::shared_ptr<BasicProxyTunnel> self)
-		{
-			if (ec) {
-				logger()->error("handleRead() error: {}", ec.message());
-				disconnect();
-				return;
-			}
-			if (bytes == 0) {
-				logger()->warn("handleRead() error: read zero bytes");
-				nextRead();
-				return;
-			}
 			if (!_running.load()) {
 				logger()->warn("handleRead() cancel: tunnel stoped");
 				return;
 			}
-			auto data = buffer_cast<const char*>(readbuf().data());
-			auto type = static_cast<Package::Type>(data[0]);
+			auto type = static_cast<Package::Type>(data->at(0));
 			if (type == Package::Type::Session) {
 				auto package = std::make_shared<SessionPackage>();
-				IoHelper(&readbuf()) >> *package;
+				IoHelper(*data) >> *package;
 				dispatch(package);
 			}
 			else if (type == Package::Type::Tunnel) {
-				TunnelMethod method = TunnelPackage::getTunnelMethod(buffer_cast<const char*>(readbuf().data()));
+				TunnelMethod method = TunnelPackage::getTunnelMethod(data->data());
 				if (method == TunnelMethod::NewSession) {
 					NewSessionRequest request;
-					IoHelper(&readbuf()) >> request;
+					IoHelper(*data) >> request;
 					logger()->debug("NewSessionRequest received ID: {}", request.id);
 					std::shared_ptr<BasicProxySession> session;
 					if (request.protoType == ProtoType::Tcp) {
@@ -72,7 +49,7 @@ namespace MyProxy {
 				}
 				else if (method == TunnelMethod::SessionDestroy) {
 					SessionId sessionId;
-					std::tie(std::ignore, std::ignore, std::ignore, sessionId) = IoHelper(&readbuf()).getTuple<Package::Type, Package::SizeType, TunnelMethod, SessionId>(_1B, _4B, _1B, _4B);
+					std::tie(std::ignore, std::ignore, std::ignore, sessionId) = IoHelper(*data).getTuple<Package::Type, Package::SizeType, TunnelMethod, SessionId>(_1B, _4B, _1B, _4B);
 					auto session = manager().get(sessionId);
 					if (session)
 						session->destroy(true);
@@ -89,13 +66,15 @@ namespace MyProxy {
 				disconnect();
 				return;
 			}
-			nextRead();
-			unused(self);
 		}
 
 		Server::Server(boost::asio::io_service &io):m_work(io)
 		{
-			m_ctx.set_verify_mode(m_ctx.verify_client_once | m_ctx.verify_peer | m_ctx.verify_fail_if_no_peer_cert);
+			auto rng = new Botan::AutoSeeded_RNG;
+			auto mgr = new Botan::TLS::Session_Manager_In_Memory(*rng);
+			auto creds = new Credentials(*rng);
+			_ctx = std::make_unique<TLSContext>
+				(rng, mgr, creds, new Policy);
 		}
 
 		Server::~Server()
@@ -105,17 +84,12 @@ namespace MyProxy {
 
 		void Server::setCA(std::string path)
 		{
-			m_ctx.load_verify_file(path);
+			_ctx->creds->addCA(path);
 		}
 
-		void Server::setCert(std::string path)
+		void Server::setCertAndKey(std::string certPath, std::string keyPath)
 		{
-			m_ctx.use_certificate_file(path, m_ctx.pem);
-		}
-
-		void Server::setKey(std::string path)
-		{
-			m_ctx.use_private_key_file(path, m_ctx.pem);
+			_ctx->creds->addPair(certPath, keyPath);
 		}
 
 		void Server::bind(std::string port, std::string bindAddress)
@@ -139,7 +113,7 @@ namespace MyProxy {
 
 		void Server::startAccept()
 		{
-			auto tunnel = std::make_shared<ServerProxyTunnel>(m_work.get_io_service(), m_ctx);
+			auto tunnel = std::make_shared<ServerProxyTunnel>(*_ctx, m_work.get_io_service());
 			//tunnel->onDisconnected = std::bind(&Server::startAccept, this);
 			m_logger->info("Start accept");
 			m_tcpAcceptor->async_accept(tunnel->connection(), [this, tunnel](const boost::system::error_code &ec) {

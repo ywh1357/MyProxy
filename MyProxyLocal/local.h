@@ -4,6 +4,8 @@
 
 #include "basic.h"
 #include "abstractproxysession.h"
+#include "abstractproxytunnel.h"
+#include <botan\tls_client.h>
 
 namespace MyProxy {
 
@@ -11,16 +13,22 @@ namespace MyProxy {
 
 		DataVec parseHost(AddrType type, const DataVec &vec);
 
-		class LocalProxyTunnel : public BasicProxyTunnel {
+		class LocalProxyTunnel : public AbstractProxyTunnel {
 		public:
-			LocalProxyTunnel(boost::asio::io_service &io, boost::asio::ssl::context &ctx):BasicProxyTunnel(io, ctx, "LocalProxyTunnel"){}
+			LocalProxyTunnel(TLSContext &ctx, boost::asio::io_service &io) :
+				AbstractProxyTunnel(io, "LocalProxyTunnel"), _ctx(ctx)
+			{}
 			virtual void start() override {
 				logger()->debug("Local Tunnel start handshake");
-				handshake();
+				channel() = std::make_shared<Botan::TLS::Client>
+					(*this, *_ctx.session_mgr, *_ctx.creds, *_ctx.policy, *_ctx.rng);
+				nextRead();
 			}
+			virtual bool tls_session_established(const Botan::TLS::Session& session) override;
 		protected:
-			virtual void handshake() override;
-			virtual void handleRead(const boost::system::error_code &ec, size_t bytes, std::shared_ptr<BasicProxyTunnel>) override;
+			virtual void handleRead(std::shared_ptr<DataVec> data) override;
+		private:
+			TLSContext & _ctx;
 		};
 
 		template <typename Protocol>
@@ -77,7 +85,7 @@ namespace MyProxy {
 					auto[ver, num] = io.getTuple<ProtoVer, size_t>(_1B, _1B);
 					if (ver != ProtoVer::Socket5) {
 						this->logger()->error("Session ID: {} unsupported version: 0x{:x}", this->id(),static_cast<uint8_t>(ver));
-						this->destroy(); //error unsupport
+						this->destroy(true); //error unsupport
 						return;
 					}
 					DataVec authMethodList(num);
@@ -94,7 +102,7 @@ namespace MyProxy {
 						async_write(this->socket(), buffer(*rsp), transfer_all(), [this, rsp, self](const boost::system::error_code &ec, size_t bytes) {
 							if (ec) {
 								this->logger()->error("Session ID: {} response write error: {}", this->id(),ec.message());
-								this->destroy(); //error
+								this->destroy(true); //error
 								return;
 							}
 							this->handshakeTunnel();
@@ -102,13 +110,13 @@ namespace MyProxy {
 					}
 					else {
 						this->logger()->error("Session ID: {} unsupported method", this->id());
-						this->destroy(); //error unsupport
+						this->destroy(true); //error unsupport
 						return;
 					}
 				}
 				else {
 					this->logger()->error("Session ID: {} handshakeLocal() error", this->id(), ec.message());
-					this->destroy();
+					this->destroy(true);
 				}
 			});
 		}
@@ -156,7 +164,7 @@ namespace MyProxy {
 						break;
 					default:
 						this->logger()->error("Session ID: {} unsupported request type {}", this->id(), ec.message(), _reqType);
-						this->destroy(); //error unsupport
+						this->destroy(true); //error unsupport
 						return;
 						break;
 					}
@@ -173,7 +181,7 @@ namespace MyProxy {
 						break;
 					default:
 						this->logger()->error("Session ID: {} unknown address type {}", this->id(), ec.message(), _addrType);
-						this->destroy(); //error
+						this->destroy(true); //error
 						break;
 					}
 					_destHost.resize(hostSize);
@@ -186,7 +194,7 @@ namespace MyProxy {
 				}
 				else {
 					this->logger()->error("Session ID: {} handshakeTunnel() error {}", this->id(), ec.message());
-					this->destroy();
+					this->destroy(true);
 				}
 			});
 		}
@@ -223,7 +231,7 @@ namespace MyProxy {
 			}
 			else {
 				this->logger()->debug("Session ID: {} handshake state failed {}", this->id(), _state);
-				this->destroy();
+				this->destroy(true);
 			}
 			//write() must call after startForwarding(),otherwise _running not be set to true, should fix it.
 			this->write(std::make_shared<DataVec>(std::move(buf))); 
@@ -234,8 +242,8 @@ namespace MyProxy {
 			Local(boost::asio::io_service &io);
 			~Local();
 			void setServer(std::string host, std::string port);
-			void setCert(std::string path);
-			void setKey(std::string path);
+			void setCA(std::string path);
+			void setCertAndKey(std::string certPath, std::string keyPath);
 			void bind(std::string port, std::string bindAddress = std::string());
 			void start();
 		private:
@@ -251,10 +259,9 @@ namespace MyProxy {
 			SessionId m_maxSessionId = 0;
 			std::shared_ptr<LocalProxyTunnel> m_tunnel;
 			boost::asio::ip::tcp::resolver m_resolver;
+			std::unique_ptr<TLSContext> _ctx;
 			Logger m_logger = spdlog::stdout_color_mt("Local");
-			boost::asio::ssl::context m_ctx{ boost::asio::ssl::context::tlsv12_client };
 			std::shared_mutex tunnelMutex;
-			//std::atomic<bool> _tunnelAvailable{ false };
 		};
 
 	}

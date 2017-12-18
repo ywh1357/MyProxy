@@ -15,6 +15,7 @@
 #include <utility>
 #include <mutex>
 #include <shared_mutex>
+//log
 #include <spdlog/spdlog.h>
 
 namespace MyProxy {
@@ -40,7 +41,7 @@ namespace MyProxy {
 	class BasicProxyTunnel : public std::enable_shared_from_this<BasicProxyTunnel> {
 	public:
 		using ssl_socket = boost::asio::ssl::stream<boost::asio::ip::tcp::socket>;
-		BasicProxyTunnel(boost::asio::io_service &io, boost::asio::ssl::context &ctx, std::string loggerName = "Tunnel");
+		BasicProxyTunnel(boost::asio::io_service &io, std::string loggerName = "Tunnel");
 		virtual ~BasicProxyTunnel();
 		virtual void start() = 0;
 		std::shared_ptr<BasicProxyTunnel> self() {
@@ -52,17 +53,16 @@ namespace MyProxy {
 		SessionManager& manager() {
 			return m_manager;
 		}
-		ssl_socket::lowest_layer_type& connection() {
-			return m_tunnelConnection.lowest_layer();
+		boost::asio::ip::tcp::socket& connection() {
+			return _connection;
 		}
-		virtual void write(std::shared_ptr<DataVec> dataPtr);
+		virtual void write(std::shared_ptr<DataVec> dataPtr) = 0;
 		void sessionDestroyNotify(SessionId id);
 	protected:
+		virtual void write_ex(std::shared_ptr<DataVec> dataPtr);
 		virtual void write_impl();
-		virtual void handshake() = 0;
-		virtual void startProcess();
 		virtual void nextRead();
-		virtual void handleRead(const boost::system::error_code &ec, size_t bytes,std::shared_ptr<BasicProxyTunnel>) = 0;
+		virtual void handleRead(std::shared_ptr<DataVec> data) = 0;
 		void dispatch(std::shared_ptr<SessionPackage> package);
 		boost::asio::streambuf& readbuf() {
 			return m_readBuffer;
@@ -73,9 +73,6 @@ namespace MyProxy {
 		Logger& logger() {
 			return m_logger;
 		}
-		ssl_socket& socket() {
-			return m_tunnelConnection;
-		}
 		void disconnect();
 	public:
 		std::function<void()> onReady;
@@ -83,10 +80,10 @@ namespace MyProxy {
 	protected:
 		std::atomic<bool> _running{ true };
 		std::atomic<bool> _handshakeFinished{ false };
+		virtual void onReceived(const boost::system::error_code & ec, size_t bytes, std::shared_ptr<BasicProxyTunnel> self) = 0;
 	private:
-		//boost::asio::ip::tcp::endpoint m_serverEndpoint;
 		boost::asio::io_service &io;
-		ssl_socket m_tunnelConnection;
+		boost::asio::ip::tcp::socket _connection;
 		boost::asio::strand m_writeStrand;
 		//boost::asio::strand m_readStrand; //not needed
 		std::queue<std::shared_ptr<DataVec>> m_writeQueue;
@@ -129,7 +126,7 @@ namespace MyProxy {
 		boost::asio::io_service& service() {
 			return io;
 		}
-		std::shared_ptr<BasicProxyTunnel> tunnel() { return _tunnel; }
+		std::shared_ptr<BasicProxyTunnel>& tunnel() { return _tunnel; }
 		Logger logger() {
 			return m_logger;
 		}

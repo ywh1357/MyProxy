@@ -6,7 +6,9 @@ using namespace boost::asio;
 namespace MyProxy {
 	
 	std::shared_ptr<spdlog::logger> SessionManager::logger = spdlog::stdout_color_mt("SessionManager");;
-
+	/*
+		SessionManager implement
+	*/
 	std::shared_ptr<BasicProxySession> MyProxy::SessionManager::get(SessionId id)
 	{
 		std::shared_lock<std::shared_mutex> locker{ sessionsMutex };
@@ -69,8 +71,12 @@ namespace MyProxy {
 		}
 		return false;
 	}
-	BasicProxyTunnel::BasicProxyTunnel(boost::asio::io_service & io, boost::asio::ssl::context &ctx, std::string loggerName) :
-		io(io), m_writeStrand(io), m_tunnelConnection(io, ctx)
+
+	/*
+		BasicProxyTunnel implement
+	*/
+	BasicProxyTunnel::BasicProxyTunnel(boost::asio::io_service & io, std::string loggerName) :
+		io(io), m_writeStrand(io), _connection(io)
 	{
 		m_logger = spdlog::get(loggerName);
 		if (!m_logger) {
@@ -79,25 +85,6 @@ namespace MyProxy {
 	}
 	BasicProxyTunnel::~BasicProxyTunnel()
 	{
-	}
-	void BasicProxyTunnel::write(std::shared_ptr<DataVec> dataPtr)
-	{
-		if (!_running.load())
-			return;
-		m_writeStrand.post([this, dataPtr = std::move(dataPtr), self = shared_from_this()]{
-			if (!_running.load()) {
-				m_logger->warn("BasicProxyTunnel::write() failed: Tunnel not running");
-				return;
-			}
-			m_writeQueue.push(std::move(dataPtr));
-			if (m_writeQueue.size() > 1) {
-				return;
-			}
-			else {
-				//m_writeStrand.post(std::bind(&BasicProxyTunnel::write_impl, this));
-				write_impl();
-			}
-		});
 	}
 	void BasicProxyTunnel::sessionDestroyNotify(SessionId id)
 	{
@@ -112,27 +99,37 @@ namespace MyProxy {
 		if (onDisconnected) {
 			onDisconnected();
 		}
-		std::function<void()> destroy = [this, self = shared_from_this()] {
-			m_manager.clear();
-			//if (_running.load()) {
-			//	disconnect();
-			//}
-			boost::system::error_code ec;
-			connection().close(ec);
-			if (ec) {
-				m_logger->debug("Close error: ", ec.message());
+		m_manager.clear();
+		boost::system::error_code ec;
+		_connection.shutdown(_connection.shutdown_both, ec);
+		if (ec) {
+			m_logger->debug("shutdown error: ", ec.message());
+		}
+		ec.clear();
+		_connection.close(ec);
+		if (ec) {
+			m_logger->debug("Close error: ", ec.message());
+		}
+		m_logger->debug("Disconnected");
+	}
+	void BasicProxyTunnel::write_ex(std::shared_ptr<DataVec> dataPtr)
+	{
+		if (!_running.load())
+			return;
+		m_writeStrand.post([this, dataPtr = std::move(dataPtr), self = shared_from_this()]{
+			if (!_running.load()) {
+				m_logger->warn("BasicProxyTunnel::write() failed: Tunnel not running");
+				return;
 			}
-			m_logger->debug("Disconnected");
-		};
-		if (!_handshakeFinished.exchange(false)) {
-			destroy();
+		m_writeQueue.push(std::move(dataPtr));
+		if (m_writeQueue.size() > 1) {
 			return;
 		}
-		m_tunnelConnection.async_shutdown([this, destroy, self = shared_from_this()](const boost::system::error_code &ec){
-			if (ec)
-				m_logger->debug("SSL shutdown error: ", ec.message());
-			destroy();
-		});
+		else {
+			//m_writeStrand.post(std::bind(&BasicProxyTunnel::write_impl, this));
+			write_impl();
+		}
+			});
 	}
 	void BasicProxyTunnel::write_impl()
 	{
@@ -140,7 +137,7 @@ namespace MyProxy {
 			m_logger->warn("write queue empty");
 			return;
 		}
-		async_write(m_tunnelConnection, boost::asio::buffer(*m_writeQueue.front()), boost::asio::transfer_all(),
+		async_write(_connection, boost::asio::buffer(*m_writeQueue.front()), boost::asio::transfer_all(),
 			m_writeStrand.wrap([this, self = shared_from_this()](const boost::system::error_code &ec, size_t) {
 			m_writeQueue.pop(); //drop
 			if (ec) {
@@ -154,21 +151,14 @@ namespace MyProxy {
 			}
 		}));
 	}
-	void BasicProxyTunnel::startProcess()
-	{
-		_handshakeFinished.store(true);
-		nextRead();
-	}
 
-	void MyProxy::BasicProxyTunnel::nextRead()
+	void BasicProxyTunnel::nextRead()
 	{
 		using namespace boost::asio;
-		async_read(m_tunnelConnection, m_readBuffer,
-			[this, self = this->shared_from_this()](const boost::system::error_code &ec, size_t bytes) -> size_t {
-			if (ec)
-				return 0;
-			return Package::remainBytes(buffer_cast<const char*>(m_readBuffer.data()), bytes);
-		}, std::bind(&BasicProxyTunnel::handleRead, this, std::placeholders::_1, std::placeholders::_2, this->shared_from_this()));
+		_connection.async_read_some(
+			m_readBuffer.prepare(8 * 1024),
+			std::bind(&BasicProxyTunnel::onReceived, this, std::placeholders::_1, std::placeholders::_2, shared_from_this())
+		);
 	}
 
 	void BasicProxyTunnel::dispatch(std::shared_ptr<SessionPackage> package)

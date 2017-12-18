@@ -1,11 +1,13 @@
 #pragma once
 #include "basic.h"
 #include "abstractproxysession.h"
+#include "abstractproxytunnel.h"
 #include <chrono>
 #include <unordered_map>
 #include <mutex>
 #include <shared_mutex>
 #include <thread>
+#include <botan/tls_server.h>
 
 namespace MyProxy {
 
@@ -34,15 +36,15 @@ namespace MyProxy {
 				std::shared_ptr<CacheRecord<Protocol>>,
 				std::function<size_t(const typename Protocol::resolver::query&)>,
 				std::function<size_t(const typename Protocol::resolver::query&, const typename Protocol::resolver::query&)> >;
-			//determine _resolveCache's iterator valid
-			template <typename Protocol>
-			static const typename ResolveCache::CacheMapType<Protocol>::iterator invalid;
+			//determine _resolveCache's iterator invalid
+			//template <typename Protocol>
+			//static const typename ResolveCache::CacheMapType<Protocol>::iterator invalid;
 			//cache record
 			template<typename Protocol>
 			static void cache(const typename Protocol::resolver::query &query, const typename CacheRecord<Protocol>::IteratorType &iter) {
 				//write lock
 				std::unique_lock<std::shared_mutex> locker(_resolveCacheMutex);
-				//insert or rewrite expired record
+				//insert record or rewrite the expired record
 				_resolveCache<Protocol>.insert_or_assign(query, std::make_shared<CacheRecord<Protocol>>(iter, query.host_name(), query.service_name()));
 			}
 			//fetch record's shared_ptr, if not found, return invalid shared_ptr
@@ -51,7 +53,7 @@ namespace MyProxy {
 				//read lock
 				std::shared_lock<std::shared_mutex> locker(_resolveCacheMutex);
 				auto iter = _resolveCache<Protocol>.find(query);
-				if (iter != invalid<Protocol>)
+				if (iter != _resolveCache<Protocol>.end())
 					return iter->second;
 				else
 					return std::shared_ptr<CacheRecord<Protocol>>();
@@ -72,20 +74,25 @@ namespace MyProxy {
 			static ResolveCache::CacheMapType<Protocol> _resolveCache;
 		};
 
-		class ServerProxyTunnel : public BasicProxyTunnel {
+		class ServerProxyTunnel : public AbstractProxyTunnel {
 		public:
-			ServerProxyTunnel(boost::asio::io_service &io, boost::asio::ssl::context &ctx) :BasicProxyTunnel(io, ctx, "ServerProxyTunnel") {
+			ServerProxyTunnel(TLSContext &ctx, boost::asio::io_service & io):
+				AbstractProxyTunnel(io, "ServerProxyTunnel"),_ctx(ctx)
+			{
 			}
 			~ServerProxyTunnel() {
 				//logger()->debug("destroyed");
 			}
 			virtual void start() override {
-				logger()->debug("Server Tunnel start handshake");
-				handshake();
+				logger()->debug("Server Tunnel start");
+				channel() = std::make_shared<Botan::TLS::Server>
+					(*this, *_ctx.session_mgr, *_ctx.creds, *_ctx.policy, *_ctx.rng);
+				nextRead();
 			}
-			virtual void handshake() override;
 		protected:
-			virtual void handleRead(const boost::system::error_code &ec, size_t bytes, std::shared_ptr<BasicProxyTunnel>) override;
+			virtual void handleRead(std::shared_ptr<DataVec> data) override;
+		private:
+			TLSContext & _ctx;
 		};
 
 		template <typename Protocol>
@@ -148,7 +155,7 @@ namespace MyProxy {
 							return;
 						this->logger()->warn("ID: {} Connect to destination: {}:{} failed: {}", this->id(), hostStr, _destPort, ec.message());
 						this->statusNotify(State::Failure);
-						this->destroy();
+						this->destroy(true);
 						return;
 					}
 					auto ep = (*it).endpoint();
@@ -180,7 +187,7 @@ namespace MyProxy {
 							return;
 						this->logger()->warn("ID: {} Resolve {}:{} failed: {}", this->id(), hostStr, _destPort, ec.message());
 						this->statusNotify(State::Failure);
-						this->destroy();
+						this->destroy(true);
 						return;
 					}
 					ResolveCache::cache<Protocol>(*query, it);
@@ -202,8 +209,7 @@ namespace MyProxy {
 			Server(boost::asio::io_service &io);
 			~Server();
 			void setCA(std::string path);
-			void setCert(std::string path);
-			void setKey(std::string path);
+			void setCertAndKey(std::string certPath,std::string keyPath);
 			void bind(std::string port, std::string bindAddress = std::string());
 			void start();
 		private:
@@ -211,9 +217,9 @@ namespace MyProxy {
 		private:
 			boost::asio::io_service::work m_work;
 			std::shared_ptr<boost::asio::ip::tcp::acceptor> m_tcpAcceptor;
-			std::shared_ptr<ServerProxyTunnel> m_tunnel;
+			//std::shared_ptr<ServerProxyTunnel> m_tunnel;
 			Logger m_logger = spdlog::stdout_color_mt("Server");
-			boost::asio::ssl::context m_ctx{ boost::asio::ssl::context::tlsv12_server };
+			std::unique_ptr<TLSContext> _ctx;
 		};
 	}
 }

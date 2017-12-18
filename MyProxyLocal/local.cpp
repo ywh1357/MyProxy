@@ -7,51 +7,31 @@ using namespace boost::asio;
 namespace MyProxy {
 
 	namespace Local {
-		void LocalProxyTunnel::handshake()
+		bool LocalProxyTunnel::tls_session_established(const Botan::TLS::Session & session)
 		{
-			socket().async_handshake(ssl::stream_base::client, [this, self = shared_from_this()](const boost::system::error_code &ec){
-				if (ec) {
-					logger()->error("handshake() error: {}", ec.message());
-					disconnect();
-					return;
-				}
-				logger()->debug("handshake success");
-				startProcess();
-				if (onReady) {
-					logger()->debug("Ready notify");
-					onReady();
-				}
-			});
+			if (onReady) {
+				logger()->debug("Ready notify");
+				onReady();
+			}
+			return true;
 		}
-		void LocalProxyTunnel::handleRead(const boost::system::error_code & ec, size_t bytes, std::shared_ptr<BasicProxyTunnel> self)
+		void LocalProxyTunnel::handleRead(std::shared_ptr<DataVec> data)
 		{
-			if (ec) {
-				logger()->error("handleRead() error: {}", ec.message());
-				disconnect();
-				return;
-			}
-			if (bytes == 0) {
-				logger()->warn("handleRead() error: read zero bytes");
-				nextRead();
-				return;
-			}
 			if (!_running.load()) {
 				logger()->warn("handleRead() cancel: tunnel stoped");
 				return;
 			}
-			auto data = boost::asio::buffer_cast<const char*>(readbuf().data());
-			auto type = static_cast<Package::Type>(data[0]);
+			auto type = static_cast<Package::Type>(data->at(0));
 			if (type == Package::Type::Session) {
 				auto package = std::make_shared<SessionPackage>();
-				IoHelper(&readbuf()) >> *package;
-				logger()->trace("{} bytes received", bytes);
+				IoHelper(*data) >> *package;
 				dispatch(package);
 			}
 			else if (type == Package::Type::Tunnel) {
-				TunnelMethod method = TunnelPackage::getTunnelMethod(buffer_cast<const char*>(readbuf().data()));
+				TunnelMethod method = TunnelPackage::getTunnelMethod(data->data());
 				if (method == TunnelMethod::SessionDestroy) {
 					SessionId sessionId;
-					std::tie(std::ignore, std::ignore, std::ignore, sessionId) = IoHelper(&readbuf()).getTuple<Package::Type, Package::SizeType, TunnelMethod, SessionId>(_1B, _4B, _1B, _4B);
+					std::tie(std::ignore, std::ignore, std::ignore, sessionId) = IoHelper(*data).getTuple<Package::Type, Package::SizeType, TunnelMethod, SessionId>(_1B, _4B, _1B, _4B);
 					auto session = manager().get(sessionId);
 					if (session)
 						session->destroy(true);
@@ -68,13 +48,15 @@ namespace MyProxy {
 				disconnect();
 				return;
 			}
-			nextRead(); //maybe change position?
-			unused(self);
 		}
 
 		Local::Local(boost::asio::io_service &io): m_work(io), m_resolver(io), m_timer(io)
 		{
-			m_ctx.set_verify_mode(m_ctx.verify_none);
+			auto rng = new Botan::AutoSeeded_RNG;
+			auto mgr = new Botan::TLS::Session_Manager_In_Memory(*rng);
+			auto creds = new Credentials(*rng);
+			_ctx = std::make_unique<TLSContext>
+				(rng, mgr, creds, new Policy);
 		}
 		Local::~Local()
 		{
@@ -86,14 +68,14 @@ namespace MyProxy {
 			m_serverPort = port;
 		}
 
-		void Local::setCert(std::string path)
+		void Local::setCA(std::string path)
 		{
-			m_ctx.use_certificate_file(path, m_ctx.pem);
+			_ctx->creds->addCA(path);
 		}
 
-		void Local::setKey(std::string path)
+		void Local::setCertAndKey(std::string certPath, std::string keyPath)
 		{
-			m_ctx.use_private_key_file(path, m_ctx.pem);
+			_ctx->creds->addPair(certPath, keyPath);
 		}
 
 		void Local::bind(std::string port, std::string bindAddress)
@@ -112,7 +94,7 @@ namespace MyProxy {
 
 		void Local::start()
 		{
-			auto tunnel = std::make_shared<LocalProxyTunnel>(m_work.get_io_service(), m_ctx);
+			auto tunnel = std::make_shared<LocalProxyTunnel>(*_ctx, m_work.get_io_service());
 			tunnel->onDisconnected = [this] {
 				//_tunnelAvailable.store(false);
 				std::unique_lock<std::shared_mutex> locker(tunnelMutex);
@@ -174,8 +156,8 @@ namespace MyProxy {
 				m_logger->info("Connectd to server: {}:{}", ep.address().to_string(), ep.port());
 				std::unique_lock<std::shared_mutex> locker(tunnelMutex);
 				m_tunnel = tunnel;
-				m_tunnel->start();
 				m_tunnel->onReady = std::bind(&Local::startAccept, this);
+				m_tunnel->start();
 				//startAccept();
 			});
 		}

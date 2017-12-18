@@ -33,6 +33,9 @@
     <ClInclude Include="packages.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="abstractproxytunnel.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="basic.cpp">
@@ -48,6 +51,9 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="packages.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="abstractproxytunnel.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
