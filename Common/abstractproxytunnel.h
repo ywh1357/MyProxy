@@ -10,6 +10,7 @@
 #include <botan/certstor.h>
 #include <botan/x509_ca.h>
 #include <botan/credentials_manager.h>
+#include <botan/data_src.h>
 
 namespace MyProxy {
 
@@ -44,12 +45,21 @@ namespace MyProxy {
 		}
 		//callback
 		std::vector<Botan::X509_Certificate> cert_chain(
-			const std::vector<std::string>& cert_key_types,
+			const std::vector<std::string>& algos,
 			const std::string& type,
-			const std::string& context) override
+			const std::string& hostname) override
 		{
 			// return the certificate chain being sent to the tls client
-			return certs();
+			std::shared_lock<std::shared_mutex> locker(_mutex);
+			for (auto const& i : _creds)
+			{
+				if (std::find(algos.begin(), algos.end(), i.key->algo_name()) == algos.end())
+					continue;
+				if (hostname != "" && !i.certs[0].matches_dns_name(hostname))
+					continue;
+				return i.certs;
+			}
+			return std::vector<Botan::X509_Certificate>();
 		}
 		//callback
 		Botan::Private_Key* private_key_for(const Botan::X509_Certificate& cert,
@@ -57,22 +67,38 @@ namespace MyProxy {
 			const std::string& context) override
 		{
 			// return the private key associated with the leaf certificate,
-			return getKey(cert);
+			std::shared_lock<std::shared_mutex> locker(_mutex);
+			for (auto const& i : _creds)
+			{
+				if (cert == i.certs[0])
+					return i.key.get();
+			}
+			return nullptr;
 		}
 		//add certificate and private key from memory
-		void addPair(const Botan::X509_Certificate& cert, std::shared_ptr<Botan::Private_Key> key) {
-			std::unique_lock<std::shared_mutex> locker(_mutex);
-			pairs[cert] = key;
-			_certs.insert(cert);
-		}
+		//void addPair(const Botan::X509_Certificate& cert, std::shared_ptr<Botan::Private_Key> key) {
+		//	std::unique_lock<std::shared_mutex> locker(_mutex);
+		//	pairs[cert] = key;
+		//	_certs.insert(cert);
+		//}
 		//add certificate and private key from file
 		void addPair(const std::string& certPath, const std::string& keyPath) {
 			std::unique_lock<std::shared_mutex> locker(_mutex);
-			Botan::X509_Certificate cert(certPath);
-			std::shared_ptr<Botan::Private_Key> key(Botan::PKCS8::load_key(keyPath,_rng));
-			std::cout << "Load key: " << key->algo_name() << std::endl;
-			_certs.insert(cert);
-			pairs.insert_or_assign(std::move(cert), key);
+			Certificate_Info cert;
+			cert.key.reset(Botan::PKCS8::load_key(keyPath, _rng));
+			Botan::DataSource_Stream in(certPath);
+			while (!in.end_of_data()) {
+				try
+				{
+					cert.certs.push_back(Botan::X509_Certificate(in));
+				}
+				catch (std::exception& ex)
+				{
+					std::cerr << "Load cert chain error: " << ex.what() << std::endl;
+				}
+				// TODO: attempt to validate chain ourselves
+				_creds.push_back(cert);
+			}
 		}
 		//get cert chain
 		std::vector<Botan::X509_Certificate> certs() {
@@ -82,7 +108,8 @@ namespace MyProxy {
 		//memory safe?
 		Botan::Private_Key* getKey(const Botan::X509_Certificate& cert) {
 			std::shared_lock<std::shared_mutex> locker(_mutex);
-			return pairs[cert].get();
+			Botan::Private_Key* key = pairs[cert].get();
+			return key;
 		}
 		void addCA(const std::string& path) {
 			std::unique_lock<std::shared_mutex> locker(_mutex);
@@ -94,6 +121,12 @@ namespace MyProxy {
 			return _caStore;
 		}
 	private:
+		struct Certificate_Info
+		{
+			std::vector<Botan::X509_Certificate> certs;
+			std::shared_ptr<Botan::Private_Key> key;
+		};
+		std::vector<Certificate_Info> _creds;
 		Botan::Certificate_Store_In_Memory _caStore;
 		bool hasCA = false;
 		std::map<Botan::X509_Certificate, std::shared_ptr<Botan::Private_Key>> pairs;

@@ -17,7 +17,7 @@ int main() {
 
 	MyProxy::Server::Server server(io);
 	server.bind("1084");
-	server.setCA("E:\\pki\\cacert.pem");
+	//server.setCA("E:\\pki\\cacert.pem");
 	server.setCertAndKey("E:\\pki\\servercert.pem", "E:\\pki\\serverkey.pkcs8.pem"); //openssl pkcs8 -topk8 -in .\serverkey.pem -nocrypt -out serverkey.pkcs8.pem
 	server.start();
 
