@@ -179,7 +179,8 @@ namespace MyProxy {
 		if (ec) {
 			logger()->error("AbstractProxyTunnel::onReceived() error: {}", ec.message());
 			std::unique_lock<std::shared_mutex> locker(_stateMutex);
-			_channel->close();
+			if(!_channel->is_closed())
+				_channel->close();
 			disconnect();
 			return;
 		}
