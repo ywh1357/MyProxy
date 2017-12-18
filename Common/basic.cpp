@@ -89,7 +89,7 @@ namespace MyProxy {
 	void BasicProxyTunnel::sessionDestroyNotify(SessionId id)
 	{
 		SessionDestoryNotify notify{ id };
-		write_ex(std::make_shared<DataVec>(notify.toDataVec()));
+		write(std::make_shared<DataVec>(notify.toDataVec()));
 		m_manager.setNotified(id);
 	}
 	void BasicProxyTunnel::disconnect()

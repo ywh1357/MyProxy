@@ -76,13 +76,8 @@ namespace MyProxy {
 
 		class ServerProxyTunnel : public AbstractProxyTunnel {
 		public:
-			ServerProxyTunnel(Botan::TLS::Session_Manager & sessionManager, 
-				Credentials & creds, const Botan::TLS::Policy & policy, 
-				Botan::RandomNumberGenerator & rng, boost::asio::io_service & io):
-				AbstractProxyTunnel(
-					std::make_shared<Botan::TLS::Server>(*this, sessionManager, creds, policy, rng),
-					io, "ServerProxyTunnel"
-				) 
+			ServerProxyTunnel(TLSContext &ctx, boost::asio::io_service & io):
+				AbstractProxyTunnel(io, "ServerProxyTunnel"),_ctx(ctx)
 			{
 			}
 			~ServerProxyTunnel() {
@@ -90,12 +85,14 @@ namespace MyProxy {
 			}
 			virtual void start() override {
 				logger()->debug("Server Tunnel start");
+				channel() = std::make_shared<Botan::TLS::Server>
+					(*this, *_ctx.session_mgr, *_ctx.creds, *_ctx.policy, *_ctx.rng);
 				nextRead();
 			}
 		protected:
 			virtual void handleRead(std::shared_ptr<DataVec> data) override;
 		private:
-
+			TLSContext & _ctx;
 		};
 
 		template <typename Protocol>
@@ -221,11 +218,8 @@ namespace MyProxy {
 			boost::asio::io_service::work m_work;
 			std::shared_ptr<boost::asio::ip::tcp::acceptor> m_tcpAcceptor;
 			//std::shared_ptr<ServerProxyTunnel> m_tunnel;
-			Botan::AutoSeeded_RNG _rng;
-			Credentials _creds{ _rng };
-			Botan::TLS::Session_Manager_In_Memory _sessionMgr{ _rng };
-			Botan::TLS::Strict_Policy _policy;
 			Logger m_logger = spdlog::stdout_color_mt("Server");
+			std::unique_ptr<TLSContext> _ctx;
 		};
 	}
 }

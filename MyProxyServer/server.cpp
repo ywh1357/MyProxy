@@ -70,6 +70,11 @@ namespace MyProxy {
 
 		Server::Server(boost::asio::io_service &io):m_work(io)
 		{
+			auto rng = new Botan::AutoSeeded_RNG;
+			auto mgr = new Botan::TLS::Session_Manager_In_Memory(*rng);
+			auto creds = new Credentials(*rng);
+			_ctx = std::make_unique<TLSContext>
+				(rng, mgr, creds, new Policy);
 		}
 
 		Server::~Server()
@@ -79,12 +84,12 @@ namespace MyProxy {
 
 		void Server::setCA(std::string path)
 		{
-			_creds.addCA(path);
+			_ctx->creds->addCA(path);
 		}
 
 		void Server::setCertAndKey(std::string certPath, std::string keyPath)
 		{
-			_creds.addPair(certPath, keyPath);
+			_ctx->creds->addPair(certPath, keyPath);
 		}
 
 		void Server::bind(std::string port, std::string bindAddress)
@@ -108,7 +113,7 @@ namespace MyProxy {
 
 		void Server::startAccept()
 		{
-			auto tunnel = std::make_shared<ServerProxyTunnel>(_sessionMgr, _creds, _policy, _rng, m_work.get_io_service());
+			auto tunnel = std::make_shared<ServerProxyTunnel>(*_ctx, m_work.get_io_service());
 			//tunnel->onDisconnected = std::bind(&Server::startAccept, this);
 			m_logger->info("Start accept");
 			m_tcpAcceptor->async_accept(tunnel->connection(), [this, tunnel](const boost::system::error_code &ec) {

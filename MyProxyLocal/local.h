@@ -4,6 +4,8 @@
 
 #include "basic.h"
 #include "abstractproxysession.h"
+#include "abstractproxytunnel.h"
+#include <botan\tls_client.h>
 
 namespace MyProxy {
 
@@ -11,16 +13,22 @@ namespace MyProxy {
 
 		DataVec parseHost(AddrType type, const DataVec &vec);
 
-		class LocalProxyTunnel : public BasicProxyTunnel {
+		class LocalProxyTunnel : public AbstractProxyTunnel {
 		public:
-			LocalProxyTunnel(boost::asio::io_service &io, boost::asio::ssl::context &ctx):BasicProxyTunnel(io, ctx, "LocalProxyTunnel"){}
+			LocalProxyTunnel(TLSContext &ctx, boost::asio::io_service &io) :
+				AbstractProxyTunnel(io, "LocalProxyTunnel"), _ctx(ctx)
+			{}
 			virtual void start() override {
 				logger()->debug("Local Tunnel start handshake");
-				handshake();
+				logger()->debug("Server Tunnel start");
+				channel() = std::make_shared<Botan::TLS::Client>
+					(*this, *_ctx.session_mgr, *_ctx.creds, *_ctx.policy, *_ctx.rng);
+				nextRead();
 			}
 		protected:
-			virtual void handshake() override;
-			virtual void handleRead(const boost::system::error_code &ec, size_t bytes, std::shared_ptr<BasicProxyTunnel>) override;
+			virtual void handleRead(std::shared_ptr<DataVec> data) override;
+		private:
+			TLSContext & _ctx;
 		};
 
 		template <typename Protocol>
@@ -234,8 +242,7 @@ namespace MyProxy {
 			Local(boost::asio::io_service &io);
 			~Local();
 			void setServer(std::string host, std::string port);
-			void setCert(std::string path);
-			void setKey(std::string path);
+			void setCertAndKey(std::string certPath, std::string keyPath);
 			void bind(std::string port, std::string bindAddress = std::string());
 			void start();
 		private:
@@ -251,10 +258,9 @@ namespace MyProxy {
 			SessionId m_maxSessionId = 0;
 			std::shared_ptr<LocalProxyTunnel> m_tunnel;
 			boost::asio::ip::tcp::resolver m_resolver;
+			std::unique_ptr<TLSContext> _ctx;
 			Logger m_logger = spdlog::stdout_color_mt("Local");
-			boost::asio::ssl::context m_ctx{ boost::asio::ssl::context::tlsv12_client };
 			std::shared_mutex tunnelMutex;
-			//std::atomic<bool> _tunnelAvailable{ false };
 		};
 
 	}
