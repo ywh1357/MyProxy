@@ -37,8 +37,8 @@ namespace MyProxy {
 				std::function<size_t(const typename Protocol::resolver::query&)>,
 				std::function<size_t(const typename Protocol::resolver::query&, const typename Protocol::resolver::query&)> >;
 			//determine _resolveCache's iterator invalid
-			template <typename Protocol>
-			static const typename ResolveCache::CacheMapType<Protocol>::iterator invalid;
+			//template <typename Protocol>
+			//static const typename ResolveCache::CacheMapType<Protocol>::iterator invalid;
 			//cache record
 			template<typename Protocol>
 			static void cache(const typename Protocol::resolver::query &query, const typename CacheRecord<Protocol>::IteratorType &iter) {
@@ -53,7 +53,7 @@ namespace MyProxy {
 				//read lock
 				std::shared_lock<std::shared_mutex> locker(_resolveCacheMutex);
 				auto iter = _resolveCache<Protocol>.find(query);
-				if (iter != invalid<Protocol>)
+				if (iter != _resolveCache<Protocol>.end())
 					return iter->second;
 				else
 					return std::shared_ptr<CacheRecord<Protocol>>();

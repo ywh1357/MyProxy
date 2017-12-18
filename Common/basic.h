@@ -61,7 +61,6 @@ namespace MyProxy {
 	protected:
 		virtual void write_ex(std::shared_ptr<DataVec> dataPtr);
 		virtual void write_impl();
-		virtual void startProcess();
 		virtual void nextRead();
 		virtual void handleRead(std::shared_ptr<DataVec> data) = 0;
 		void dispatch(std::shared_ptr<SessionPackage> package);

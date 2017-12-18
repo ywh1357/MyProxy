@@ -15,13 +15,16 @@
 namespace MyProxy {
 
 	class Policy : public Botan::TLS::Policy {
-		std::vector<std::string> allowed_ciphers() const override {
-			return { "ChaCha20Poly1305", "AES-256/GCM", "AES-128/GCM", "AES-256/CCM", "AES-128/CCM", "AES-256", "AES-128",
-				"AES-256/CCM(8)", "AES-128/CCM(8)", "Camellia-256/GCM", "Camellia-128/GCM", "ARIA-256/GCM", "ARIA-128/GCM", "Camellia-256", "Camellia-128",
-				"AES-128/OCB(12)", "AES-256/OCB(12)" };
-		}
-		std::vector<std::string> allowed_key_exchange_methods() const override {
-			return { "CECPQ1", "ECDH", "DH","RSA", "SRP_SHA", "ECDHE_PSK", "DHE_PSK", "PSK" };
+		//std::vector<std::string> allowed_ciphers() const override {
+		//	return {  "AES-256/GCM", "AES-128/GCM", "AES-256/CCM", "AES-128/CCM", "AES-256", "AES-128",
+		//		"AES-256/CCM(8)", "AES-128/CCM(8)", "Camellia-256/GCM", "Camellia-128/GCM", "ARIA-256/GCM", "ARIA-128/GCM", "Camellia-256", "Camellia-128",
+		//		"AES-128/OCB(12)", "AES-256/OCB(12)" };
+		//}
+		//std::vector<std::string> allowed_key_exchange_methods() const override {
+		//	return { "CECPQ1", "ECDH", "DH","RSA", "SRP_SHA", "ECDHE_PSK", "DHE_PSK", "PSK" };
+		//}
+		bool require_cert_revocation_info() const override {
+			return false;
 		}
 	};
 
@@ -38,10 +41,8 @@ namespace MyProxy {
 			// shall return a list of certificates of CAs we trust
 			// for tls client certificates, otherwise return an empty list
 			//return std::vector<Botan::Certificate_Store*>();
-			if (hasCA)
-				return { new Botan::Certificate_Store_In_Memory(cas()) };
-			else
-				return {};
+			std::shared_lock<std::shared_mutex> locker(_mutex);
+			return _cas;
 		}
 		//callback
 		std::vector<Botan::X509_Certificate> cert_chain(
@@ -92,33 +93,17 @@ namespace MyProxy {
 				{
 					cert.certs.push_back(Botan::X509_Certificate(in));
 				}
-				catch (std::exception& ex)
+				catch (std::exception&)
 				{
-					std::cerr << "Load cert chain error: " << ex.what() << std::endl;
+					//std::cerr << "Load cert chain error: " << ex.what() << std::endl;
 				}
 				// TODO: attempt to validate chain ourselves
 				_creds.push_back(cert);
 			}
 		}
-		//get cert chain
-		std::vector<Botan::X509_Certificate> certs() {
-			std::shared_lock<std::shared_mutex> locker(_mutex);
-			return { _certs.begin(), _certs.end() };
-		}
-		//memory safe?
-		Botan::Private_Key* getKey(const Botan::X509_Certificate& cert) {
-			std::shared_lock<std::shared_mutex> locker(_mutex);
-			Botan::Private_Key* key = pairs[cert].get();
-			return key;
-		}
 		void addCA(const std::string& path) {
 			std::unique_lock<std::shared_mutex> locker(_mutex);
-			_caStore.add_certificate(Botan::X509_Certificate(path));
-			hasCA = true;
-		}
-		Botan::Certificate_Store_In_Memory cas() {
-			std::shared_lock<std::shared_mutex> locker(_mutex);
-			return _caStore;
+			_cas.push_back(new Botan::Certificate_Store_In_Memory(Botan::X509_Certificate(path)));
 		}
 	private:
 		struct Certificate_Info
@@ -127,10 +112,7 @@ namespace MyProxy {
 			std::shared_ptr<Botan::Private_Key> key;
 		};
 		std::vector<Certificate_Info> _creds;
-		Botan::Certificate_Store_In_Memory _caStore;
-		bool hasCA = false;
-		std::map<Botan::X509_Certificate, std::shared_ptr<Botan::Private_Key>> pairs;
-		std::set<Botan::X509_Certificate> _certs;
+		std::vector<Botan::Certificate_Store*> _cas;
 		std::shared_mutex _mutex;
 		Botan::RandomNumberGenerator & _rng;
 	};
@@ -152,7 +134,7 @@ namespace MyProxy {
 	public:
 		//channel: Client or Server, io: io_service
 		AbstractProxyTunnel(boost::asio::io_service &io, std::string loggerName = "AbstractProxyTunnel") :
-			BasicProxyTunnel(io, loggerName),_readStrand(io){}
+			BasicProxyTunnel(io, loggerName),_readStrand(io),_writeStrand(io),_strand(io){}
 		virtual void write(std::shared_ptr<DataVec> dataPtr) override;
 		virtual void tls_emit_data(const uint8_t data[], size_t size) override;
 		virtual void tls_record_received(uint64_t seq_no, const uint8_t data[], size_t size) override;
@@ -168,35 +150,49 @@ namespace MyProxy {
 		}
 	private:
 		boost::asio::streambuf _readBuffer2;
+		boost::asio::strand _writeStrand;
 		boost::asio::strand _readStrand;
+		boost::asio::strand _strand;
+		std::shared_mutex _stateMutex;
 		std::shared_ptr<Botan::TLS::Channel> _channel;
 	};
 
 	inline void AbstractProxyTunnel::write(std::shared_ptr<DataVec> dataPtr)
 	{
-		try {
-			_channel->send(reinterpret_cast<unsigned char*>(dataPtr->data()), dataPtr->size());
-		}
-		catch (const std::exception &ex) {
-			logger()->error("_channel->send() error: {}", ex.what());
-			throw;
-		}
+		_writeStrand.post([this, dataPtr, self = shared_from_this()]{
+			try {
+				std::shared_lock<std::shared_mutex> locker(_stateMutex);
+				if (_channel->is_active())
+					_channel->send(reinterpret_cast<const uint8_t*>(dataPtr->data()), dataPtr->size());
+			}
+			catch (const std::exception &ex) {
+				logger()->error("_channel->send() error: {}", ex.what());
+				std::unique_lock<std::shared_mutex> locker(_stateMutex);
+				_channel->close();
+				disconnect();
+			}
+		});
 	}
 
 	inline void AbstractProxyTunnel::onReceived(const boost::system::error_code & ec, size_t bytes, std::shared_ptr<BasicProxyTunnel> self)
 	{
 		if (ec) {
 			logger()->error("AbstractProxyTunnel::onReceived() error: {}", ec.message());
+			std::unique_lock<std::shared_mutex> locker(_stateMutex);
 			_channel->close();
 			disconnect();
 			return;
 		}
 		try {
-			_channel->received_data(boost::asio::buffer_cast<const unsigned char*>(readbuf().data()), bytes);
+			std::shared_lock<std::shared_mutex> locker(_stateMutex);
+			if(!_channel->is_closed())
+				_channel->received_data(boost::asio::buffer_cast<const uint8_t*>(readbuf().data()), bytes);
 		}
 		catch (const std::exception &ex) {
 			logger()->error("_channel->received_data() error: {}", ex.what());
-			throw;
+			std::unique_lock<std::shared_mutex> locker(_stateMutex);
+			_channel->close();
+			disconnect();
 		}
 		readbuf().consume(bytes);
 		nextRead();

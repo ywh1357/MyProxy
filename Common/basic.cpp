@@ -151,11 +151,6 @@ namespace MyProxy {
 			}
 		}));
 	}
-	void BasicProxyTunnel::startProcess()
-	{
-		_handshakeFinished.store(true);
-		nextRead();
-	}
 
 	void BasicProxyTunnel::nextRead()
 	{

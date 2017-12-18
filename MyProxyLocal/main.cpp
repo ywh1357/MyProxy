@@ -17,6 +17,7 @@ int main() {
 
 	MyProxy::Local::Local local(io);
 	local.bind("1083","127.0.0.1");
+	local.setCA("E:\\pki\\cacert.pem");
 	local.setServer("127.0.0.1", "1084");
 	//local.setCertAndKey("E:\\pki\\clientcert.pem", "E:\\pki\\clientkey.pkcs8.pem");
 	local.start();

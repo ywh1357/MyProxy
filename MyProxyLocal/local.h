@@ -20,11 +20,11 @@ namespace MyProxy {
 			{}
 			virtual void start() override {
 				logger()->debug("Local Tunnel start handshake");
-				logger()->debug("Server Tunnel start");
 				channel() = std::make_shared<Botan::TLS::Client>
 					(*this, *_ctx.session_mgr, *_ctx.creds, *_ctx.policy, *_ctx.rng);
 				nextRead();
 			}
+			virtual bool tls_session_established(const Botan::TLS::Session& session) override;
 		protected:
 			virtual void handleRead(std::shared_ptr<DataVec> data) override;
 		private:
@@ -242,6 +242,7 @@ namespace MyProxy {
 			Local(boost::asio::io_service &io);
 			~Local();
 			void setServer(std::string host, std::string port);
+			void setCA(std::string path);
 			void setCertAndKey(std::string certPath, std::string keyPath);
 			void bind(std::string port, std::string bindAddress = std::string());
 			void start();

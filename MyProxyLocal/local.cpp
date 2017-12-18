@@ -7,6 +7,14 @@ using namespace boost::asio;
 namespace MyProxy {
 
 	namespace Local {
+		bool LocalProxyTunnel::tls_session_established(const Botan::TLS::Session & session)
+		{
+			if (onReady) {
+				logger()->debug("Ready notify");
+				onReady();
+			}
+			return true;
+		}
 		void LocalProxyTunnel::handleRead(std::shared_ptr<DataVec> data)
 		{
 			if (!_running.load()) {
@@ -40,7 +48,6 @@ namespace MyProxy {
 				disconnect();
 				return;
 			}
-			nextRead(); //maybe change position?
 		}
 
 		Local::Local(boost::asio::io_service &io): m_work(io), m_resolver(io), m_timer(io)
@@ -59,6 +66,11 @@ namespace MyProxy {
 		{
 			m_serverHost = host;
 			m_serverPort = port;
+		}
+
+		void Local::setCA(std::string path)
+		{
+			_ctx->creds->addCA(path);
 		}
 
 		void Local::setCertAndKey(std::string certPath, std::string keyPath)
@@ -144,8 +156,8 @@ namespace MyProxy {
 				m_logger->info("Connectd to server: {}:{}", ep.address().to_string(), ep.port());
 				std::unique_lock<std::shared_mutex> locker(tunnelMutex);
 				m_tunnel = tunnel;
-				m_tunnel->start();
 				m_tunnel->onReady = std::bind(&Local::startAccept, this);
+				m_tunnel->start();
 				//startAccept();
 			});
 		}
