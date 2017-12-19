@@ -24,7 +24,7 @@ namespace MyProxy {
 			auto pkgSz = Package::getSize(rawData);
 			auto pkgData = std::make_shared<DataVec>(pkgSz);
 			io.read(*pkgData, pkgSz);
-			_readBuffer2.consume(pkgSz);
+			//_readBuffer2.consume(pkgSz);
 			handleRead(pkgData);
 		}
 	}
