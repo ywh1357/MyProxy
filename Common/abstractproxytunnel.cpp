@@ -4,11 +4,14 @@
 using namespace boost::asio;
 
 namespace MyProxy {
-	
-	/*
-		BasicProxyTunnel::Callbacks implement
-	*/
-
+	AbstractProxyTunnel::~AbstractProxyTunnel()
+	{
+		boost::system::error_code ec;
+		connection().close(ec);
+		if (ec) {
+			logger()->error("close error: {}", ec.message());
+		}
+	}
 	void AbstractProxyTunnel::tls_emit_data(const uint8_t data[], size_t size)
 	{
 		write_ex(std::make_shared<DataVec>(DataVec{ data, data + size }));
@@ -39,45 +42,105 @@ namespace MyProxy {
 	}
 	void AbstractProxyTunnel::write(std::shared_ptr<DataVec> dataPtr)
 	{
-		_writeStrand.post([this, dataPtr, self = shared_from_this()]{
+		_strand.post([this, dataPtr, self = shared_from_this()]{
+			if (_state.load() & RunningState::shutdown_write)
+				return;
 			try {
-				std::shared_lock<std::shared_mutex> locker(_stateMutex);
 				if (_channel->is_active())
 					_channel->send(reinterpret_cast<const uint8_t*>(dataPtr->data()), dataPtr->size());
 			}
 			catch (const std::exception &ex) {
 				logger()->error("_channel->send() error: {}", ex.what());
-				std::unique_lock<std::shared_mutex> locker(_stateMutex);
-				_channel->close();
-				locker.unlock();
-				disconnect();
+				shutdown();
 			}
 		});
 	}
-	void AbstractProxyTunnel::onReceived(const boost::system::error_code & ec, size_t bytes, std::shared_ptr<BasicProxyTunnel> self)
+	void AbstractProxyTunnel::write_ex(std::shared_ptr<DataVec> dataPtr)
 	{
-		if (ec) {
-			logger()->error("AbstractProxyTunnel::onReceived() error: {}", ec.message());
-			std::unique_lock<std::shared_mutex> locker(_stateMutex);
-			if (!_channel->is_closed())
-				_channel->close();
-			locker.unlock();
-			disconnect();
+		if (_state.load() & RunningState::shutdown_write)
 			return;
-		}
-		try {
-			std::shared_lock<std::shared_mutex> locker(_stateMutex);
-			if (!_channel->is_closed())
-				_channel->received_data(boost::asio::buffer_cast<const uint8_t*>(readbuf().data()), bytes);
-		}
-		catch (const std::exception &ex) {
-			logger()->error("_channel->received_data() error: {}", ex.what());
-			std::unique_lock<std::shared_mutex> locker(_stateMutex);
-			_channel->close();
-			locker.unlock();
-			disconnect();
-		}
-		readbuf().consume(bytes);
-		nextRead();
+		_strand.post([this, dataPtr = std::move(dataPtr), self = shared_from_this()]{
+			_writeQueue.push(std::move(dataPtr));
+			if (_writeQueue.size() > 1) {
+				return;
+			}
+			else {
+				write_impl();
+			}
+		});
 	}
+	void AbstractProxyTunnel::write_impl()
+	{
+		async_write(connection(), boost::asio::buffer(*_writeQueue.front()), boost::asio::transfer_all(),
+			_strand.wrap([this, self = shared_from_this()](const boost::system::error_code &ec, size_t) {
+			_writeQueue.pop(); //drop
+			if (ec) {
+				if (_state.load() & RunningState::shutdown_write)
+					return;
+				logger()->error("write error: ", ec.message());
+				shutdown();
+				disconnect();
+				return;
+			}
+			if (!_writeQueue.empty()) {
+				write_impl();
+			}
+			else if (_state.load() & RunningState::shutdown_write) {
+				boost::system::error_code shutdown_ec;
+				connection().shutdown(connection().shutdown_send, shutdown_ec);
+				if (shutdown_ec)
+					logger()->debug("shutdown send error: ", shutdown_ec.message());
+				//disconnect();
+			}
+		}));
+	}
+	void AbstractProxyTunnel::nextRead()
+	{
+		using namespace boost::asio;
+		connection().async_read_some(_readBuffer.prepare(8 * 1024),
+			_strand.wrap([this, self = shared_from_this()](const boost::system::error_code ec, size_t bytes){
+			if (ec) {
+				if (_state.load() & RunningState::shutdown_read)
+					return;
+				shutdown();
+			}
+			try {
+				std::shared_lock<std::shared_mutex> locker(_stateMutex);
+				if (!_channel->is_closed())
+					_channel->received_data(boost::asio::buffer_cast<const uint8_t*>(_readBuffer.data()), bytes);
+			}
+			catch (const std::exception &ex) {
+				logger()->error("_channel->received_data() error: {}", ex.what());
+				shutdown();
+				return;
+			}
+			_readBuffer.consume(bytes);
+			nextRead();
+			})
+		);
+	}
+	void AbstractProxyTunnel::disconnect()
+	{
+		if (!_running.exchange(false))
+			return;
+		manager().clear();
+		if (onDisconnected)
+			onDisconnected();
+	}
+	void AbstractProxyTunnel::shutdown(RunningState state = RunningState::shutdown_both)
+	{
+		using shutdown_type = boost::asio::socket_base::shutdown_type;
+		auto op = state & ~RunningState(std::atomic_fetch_or(&_state, state));
+		if (op & RunningState::shutdown_read) {
+			_strand.post([this, self = shared_from_this()]{
+				connection().shutdown(shutdown_type::shutdown_receive);
+				});
+		}
+		//if (op & RunningState::shutdown_write) {
+		//	_strand.post([this, self = shared_from_this()]{
+		//		_connection.shutdown(shutdown_type::shutdown_send);
+		//	});
+		//}
+	}
+
 }

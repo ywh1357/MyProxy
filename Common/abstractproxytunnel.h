@@ -141,32 +141,60 @@ namespace MyProxy {
 
 	class AbstractProxyTunnel : public BasicProxyTunnel, public Botan::TLS::Callbacks {
 	public:
+		enum RunningState : uint8_t { running = 0x00, shutdown_write = 0x01, shutdown_read = 0x02, shutdown_both = 0x03 };
 		//channel: Client or Server, io: io_service
 		AbstractProxyTunnel(boost::asio::io_service &io, std::string loggerName = "AbstractProxyTunnel") :
-			BasicProxyTunnel(io, loggerName),_writeStrand(io){}
-		virtual void write(std::shared_ptr<DataVec> dataPtr) override;
+			BasicProxyTunnel(io, loggerName),_writeStrand(io), _strand(io) {}
+		~AbstractProxyTunnel();
 		virtual void tls_emit_data(const uint8_t data[], size_t size) override;
 		virtual void tls_record_received(uint64_t seq_no, const uint8_t data[], size_t size) override;
 		virtual void tls_alert(Botan::TLS::Alert alert) override;
 		//If this function wishes to cancel the handshake, it can throw an exception
 		//which will send a close message to the counterparty and reset the connection state.
 		virtual bool tls_session_established(const Botan::TLS::Session& session) override;
+		virtual void write(std::shared_ptr<DataVec> dataPtr) override;
+		void shutdown(RunningState state);
 	protected:
-		//cache data to _readBuffer2 and call handleRead when a packet is received completely.
-		virtual void onReceived(const boost::system::error_code & ec, size_t bytes, std::shared_ptr<BasicProxyTunnel> self) override;
+		virtual void write_ex(std::shared_ptr<DataVec> dataPtr);
+		virtual void write_impl();
+		virtual void nextRead();
 		//called when a packet is received completely.
-		virtual void handleRead(std::shared_ptr<DataVec> data) override = 0;
+		virtual void handleRead(std::shared_ptr<DataVec> data) = 0;
 		std::shared_ptr<Botan::TLS::Channel>& channel() {
 			return _channel;
 		}
 	private:
+		enum clean_state{ read_clean, write_clean };
+		void setClean(clean_state state) {
+			switch (state) {
+			case read_clean:
+				_readClean = true;
+				break;
+			case write_clean:
+				_writeClean = true;
+				break;
+			}
+			if (_writeClean && _readClean) {
+				disconnect();
+			}
+		}
+		void disconnect();
+		//raw data buffer
+		boost::asio::streambuf _readBuffer;
 		//decrypted data buffer
 		boost::asio::streambuf _readBuffer2;
+		//strand
+		boost::asio::strand _strand;
 		//channel write strand, different to socket write strand.
 		boost::asio::strand _writeStrand;
 		//protect channel state
 		std::shared_mutex _stateMutex;
 		//abstract channel
 		std::shared_ptr<Botan::TLS::Channel> _channel;
+		std::queue<std::shared_ptr<DataVec>> _writeQueue;
+		std::atomic<uint8_t> _state{ RunningState::running };
+		bool _readClean = false;
+		bool _writeClean = false;
+		std::atomic_bool _running = true;
 	};
 }

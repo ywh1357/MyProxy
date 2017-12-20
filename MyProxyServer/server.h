@@ -65,7 +65,9 @@ namespace MyProxy {
 			}
 			template<typename Protocol>
 			static size_t queryHasher(const typename Protocol::resolver::query & q) {
-				return std::hash<std::string>{}(q.host_name() + ':' + q.service_name());
+				auto h1 = std::hash<std::string>{}(q.host_name());
+				auto h2 = std::hash<std::string>{}(q.service_name());
+				return h1 ^ (h2 << 1);
 			}
 			//fetch or cache mutex
 			static std::shared_mutex _resolveCacheMutex;

@@ -41,6 +41,8 @@ namespace MyProxy {
 	class BasicProxyTunnel : public std::enable_shared_from_this<BasicProxyTunnel> {
 	public:
 		using ssl_socket = boost::asio::ssl::stream<boost::asio::ip::tcp::socket>;
+		std::function<void()> onReady;
+		std::function<void()> onDisconnected;
 		BasicProxyTunnel(boost::asio::io_service &io, std::string loggerName = "Tunnel");
 		virtual ~BasicProxyTunnel();
 		virtual void start() = 0;
@@ -53,34 +55,16 @@ namespace MyProxy {
 		virtual void write(std::shared_ptr<DataVec> dataPtr) = 0;
 		void sessionDestroyNotify(SessionId id);
 	protected:
-		virtual void write_ex(std::shared_ptr<DataVec> dataPtr);
-		virtual void write_impl();
-		virtual void nextRead();
-		virtual void handleRead(std::shared_ptr<DataVec> data) = 0;
-		void dispatch(std::shared_ptr<SessionPackage> package);
-		boost::asio::streambuf& readbuf() {
-			return m_readBuffer;
-		}
 		boost::asio::io_service& service() {
 			return io;
 		}
 		Logger& logger() {
 			return m_logger;
 		}
-		void disconnect();
-	public:
-		std::function<void()> onReady;
-		std::function<void()> onDisconnected;
-	protected:
-		std::atomic<bool> _running{ true };
-		virtual void onReceived(const boost::system::error_code & ec, size_t bytes, std::shared_ptr<BasicProxyTunnel> self) = 0;
 	private:
+		void dispatch(std::shared_ptr<SessionPackage> package);
 		boost::asio::io_service &io;
 		boost::asio::ip::tcp::socket _connection;
-		boost::asio::strand m_writeStrand;
-		//boost::asio::strand m_readStrand; //not needed
-		std::queue<std::shared_ptr<DataVec>> m_writeQueue;
-		boost::asio::streambuf m_readBuffer;
 		SessionManager m_manager;
 		Logger m_logger;
 	};
