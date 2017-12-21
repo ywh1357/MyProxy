@@ -129,6 +129,10 @@ namespace MyProxy {
 			virtual void start() override { 
 				this->handshakeDest();
 			};
+			virtual void stop() override {
+				Base::stop();
+				_resolver.cancel();
+			}
 		private:
 			static size_t count;
 			//void handshakeTunnel(std::shared_ptr<SessionPackage> package);

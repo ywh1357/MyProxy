@@ -9,8 +9,9 @@ namespace MyProxy {
 		boost::system::error_code ec;
 		connection().close(ec);
 		if (ec) {
-			logger()->error("close error: {}", ec.message());
+			logger()->debug("close error: {}", ec.message());
 		}
+		logger()->debug("destroyed");
 	}
 	void AbstractProxyTunnel::tls_emit_data(const uint8_t data[], size_t size)
 	{
@@ -42,22 +43,25 @@ namespace MyProxy {
 	}
 	void AbstractProxyTunnel::write(std::shared_ptr<DataVec> dataPtr)
 	{
+		if (!_running.load())
+			return;
 		_strand.post([this, dataPtr, self = shared_from_this()]{
-			if (_state.load() & RunningState::shutdown_write)
+			if (!_channel->is_active())
 				return;
 			try {
-				if (_channel->is_active())
-					_channel->send(reinterpret_cast<const uint8_t*>(dataPtr->data()), dataPtr->size());
+				_channel->send(reinterpret_cast<const uint8_t*>(dataPtr->data()), dataPtr->size());
 			}
 			catch (const std::exception &ex) {
 				logger()->error("_channel->send() error: {}", ex.what());
+				_channel->close();
 				shutdown();
+				disconnect();
 			}
 		});
 	}
 	void AbstractProxyTunnel::write_ex(std::shared_ptr<DataVec> dataPtr)
 	{
-		if (_state.load() & RunningState::shutdown_write)
+		if (!_running.load())
 			return;
 		_strand.post([this, dataPtr = std::move(dataPtr), self = shared_from_this()]{
 			_writeQueue.push(std::move(dataPtr));
@@ -75,43 +79,44 @@ namespace MyProxy {
 			_strand.wrap([this, self = shared_from_this()](const boost::system::error_code &ec, size_t) {
 			_writeQueue.pop(); //drop
 			if (ec) {
-				if (_state.load() & RunningState::shutdown_write)
+				if (!_running.load())
 					return;
-				logger()->error("write error: ", ec.message());
-				shutdown();
+				logger()->debug("AbstractProxyTunnel::write_impl() error: ", ec.message());
+				shutdown(RunningState::shutdown_write);
 				disconnect();
 				return;
 			}
 			if (!_writeQueue.empty()) {
 				write_impl();
 			}
-			else if (_state.load() & RunningState::shutdown_write) {
-				boost::system::error_code shutdown_ec;
-				connection().shutdown(connection().shutdown_send, shutdown_ec);
-				if (shutdown_ec)
-					logger()->debug("shutdown send error: ", shutdown_ec.message());
-				//disconnect();
+			else if (!_running.load()) {
+				shutdown(RunningState::shutdown_write);
 			}
 		}));
 	}
 	void AbstractProxyTunnel::nextRead()
 	{
 		using namespace boost::asio;
-		connection().async_read_some(_readBuffer.prepare(8 * 1024),
-			_strand.wrap([this, self = shared_from_this()](const boost::system::error_code ec, size_t bytes){
+		if (!_running.load())
+			return;
+		connection().async_read_some(_readBuffer.prepare(4 * 1024),
+			_strand.wrap([this, self = shared_from_this()](const boost::system::error_code &ec, size_t bytes){
+			if (!_running.load() || _channel->is_closed())
+				return;
 			if (ec) {
-				if (_state.load() & RunningState::shutdown_read)
-					return;
-				shutdown();
+				logger()->debug("AbstractProxyTunnel::nextRead() error: ", ec.message());
+				shutdown(RunningState::shutdown_read);
+				disconnect();
+				return;
 			}
 			try {
-				std::shared_lock<std::shared_mutex> locker(_stateMutex);
-				if (!_channel->is_closed())
-					_channel->received_data(boost::asio::buffer_cast<const uint8_t*>(_readBuffer.data()), bytes);
+				_channel->received_data(boost::asio::buffer_cast<const uint8_t*>(_readBuffer.data()), bytes);
 			}
 			catch (const std::exception &ex) {
-				logger()->error("_channel->received_data() error: {}", ex.what());
-				shutdown();
+				logger()->warn("_channel->received_data() error: {}", ex.what());
+				shutdown(RunningState::shutdown_read);
+				_channel->close();
+				disconnect();
 				return;
 			}
 			_readBuffer.consume(bytes);
@@ -127,20 +132,25 @@ namespace MyProxy {
 		if (onDisconnected)
 			onDisconnected();
 	}
-	void AbstractProxyTunnel::shutdown(RunningState state = RunningState::shutdown_both)
+	void AbstractProxyTunnel::shutdown(RunningState state)
 	{
 		using shutdown_type = boost::asio::socket_base::shutdown_type;
 		auto op = state & ~RunningState(std::atomic_fetch_or(&_state, state));
+		boost::system::error_code ec;
 		if (op & RunningState::shutdown_read) {
-			_strand.post([this, self = shared_from_this()]{
-				connection().shutdown(shutdown_type::shutdown_receive);
-				});
+			ec.clear();
+			connection().shutdown(shutdown_type::shutdown_receive, ec);
+			if (ec) {
+				logger()->debug("shutdown receive error: {}", ec.message());
+			}
 		}
-		//if (op & RunningState::shutdown_write) {
-		//	_strand.post([this, self = shared_from_this()]{
-		//		_connection.shutdown(shutdown_type::shutdown_send);
-		//	});
-		//}
+		if (op & RunningState::shutdown_write) {
+			ec.clear();
+			connection().shutdown(shutdown_type::shutdown_send, ec);
+			if (ec) {
+				logger()->debug("shutdown send error: {}", ec.message());
+			}
+		}
 	}
 
 }

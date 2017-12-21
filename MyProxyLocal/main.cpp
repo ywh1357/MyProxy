@@ -61,7 +61,7 @@ int main(int argc,char* argv[]) {
 			try {
 				io.run();
 			}
-			catch (std::exception ex) {
+			catch (std::exception &ex) {
 				spdlog::get("IO Thread")->error("Catch exception: ",ex.what());
 				throw;
 			}

@@ -61,8 +61,8 @@ namespace MyProxy {
 		Logger& logger() {
 			return m_logger;
 		}
-	private:
 		void dispatch(std::shared_ptr<SessionPackage> package);
+	private:
 		boost::asio::io_service &io;
 		boost::asio::ip::tcp::socket _connection;
 		SessionManager m_manager;

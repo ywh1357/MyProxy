@@ -153,7 +153,7 @@ namespace MyProxy {
 		//which will send a close message to the counterparty and reset the connection state.
 		virtual bool tls_session_established(const Botan::TLS::Session& session) override;
 		virtual void write(std::shared_ptr<DataVec> dataPtr) override;
-		void shutdown(RunningState state);
+		void shutdown(RunningState state = RunningState::shutdown_both);
 	protected:
 		virtual void write_ex(std::shared_ptr<DataVec> dataPtr);
 		virtual void write_impl();
@@ -163,22 +163,8 @@ namespace MyProxy {
 		std::shared_ptr<Botan::TLS::Channel>& channel() {
 			return _channel;
 		}
-	private:
-		enum clean_state{ read_clean, write_clean };
-		void setClean(clean_state state) {
-			switch (state) {
-			case read_clean:
-				_readClean = true;
-				break;
-			case write_clean:
-				_writeClean = true;
-				break;
-			}
-			if (_writeClean && _readClean) {
-				disconnect();
-			}
-		}
 		void disconnect();
+	private:
 		//raw data buffer
 		boost::asio::streambuf _readBuffer;
 		//decrypted data buffer
@@ -193,8 +179,6 @@ namespace MyProxy {
 		std::shared_ptr<Botan::TLS::Channel> _channel;
 		std::queue<std::shared_ptr<DataVec>> _writeQueue;
 		std::atomic<uint8_t> _state{ RunningState::running };
-		bool _readClean = false;
-		bool _writeClean = false;
 		std::atomic_bool _running = true;
 	};
 }
