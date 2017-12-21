@@ -75,7 +75,7 @@ namespace MyProxy {
 	/*
 		BasicProxyTunnel implement
 	*/
-	BasicProxyTunnel::BasicProxyTunnel(boost::asio::io_service & io, std::string loggerName) :
+	BasicProxyTunnel::BasicProxyTunnel(boost::asio::io_context & io, std::string loggerName) :
 		io(io), _connection(io)
 	{
 		m_logger = spdlog::get(loggerName);

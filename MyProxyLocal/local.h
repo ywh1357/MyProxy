@@ -15,7 +15,7 @@ namespace MyProxy {
 
 		class LocalProxyTunnel : public AbstractProxyTunnel {
 		public:
-			LocalProxyTunnel(TLSContext &ctx, boost::asio::io_service &io) :
+			LocalProxyTunnel(TLSContext &ctx, boost::asio::io_context &io) :
 				AbstractProxyTunnel(io, "LocalProxyTunnel"), _ctx(ctx)
 			{}
 			virtual void start() override {
@@ -34,7 +34,7 @@ namespace MyProxy {
 		template <typename Protocol>
 		class LocalProxySession : public AbstractProxySession<Protocol> {
 		public:
-			LocalProxySession(SessionId id, boost::asio::io_service &io) :
+			LocalProxySession(SessionId id, boost::asio::io_context &io) :
 				AbstractProxySession<Protocol>(id, io, "LocalSession") {
 				++LocalProxySession<Protocol>::count;
 			}
@@ -239,7 +239,7 @@ namespace MyProxy {
 
 		class Local {
 		public:
-			Local(boost::asio::io_service &io);
+			Local(boost::asio::io_context &io);
 			~Local();
 			void setServer(std::string host, std::string port);
 			void setCA(std::string path);
@@ -251,7 +251,8 @@ namespace MyProxy {
 			void startConnect(std::shared_ptr<LocalProxyTunnel> tunnel, boost::asio::ip::tcp::resolver::iterator it);
 			SessionId newSessionId();
 		private:
-			boost::asio::io_service::work m_work;
+			boost::asio::io_context &_io;
+			boost::asio::executor_work_guard<boost::asio::io_context::executor_type> m_work;
 			std::shared_ptr<boost::asio::ip::tcp::acceptor> m_tcpAcceptor;
 			boost::asio::deadline_timer m_timer;
 			std::string m_serverHost;

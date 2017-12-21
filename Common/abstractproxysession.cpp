@@ -1,5 +1,7 @@
 #include "abstractproxysession.h"
 
+using namespace boost::asio;
+
 namespace MyProxy {
 
 	template<>
@@ -11,7 +13,7 @@ namespace MyProxy {
 		}
 		//logger()->trace("AbstractProxySession<boost::asio::ip::tcp>::write_impl() {} bytes write method start async_write", m_writeQueue.front()->size());
 		async_write(m_socket, boost::asio::buffer(*m_writeQueue.front()), boost::asio::transfer_all(),
-			m_writeStrand.wrap([this, self = shared_from_this()](const boost::system::error_code &ec, size_t bytes){
+			bind_executor(m_writeStrand, [this, self = shared_from_this()](const boost::system::error_code &ec, size_t){
 			m_writeQueue.pop(); //drop
 			if (ec) {
 				if (!_running.load())
@@ -34,8 +36,8 @@ namespace MyProxy {
 		//	return;
 		//}
 		m_socket.async_send(boost::asio::buffer(*m_writeQueue.front()),
-			m_writeStrand.wrap([this, self = shared_from_this()](const boost::system::error_code &ec, size_t) {
-			m_writeQueue.pop();
+			bind_executor(m_writeStrand, [this, self = shared_from_this()](const boost::system::error_code &ec, size_t){
+			m_writeQueue.pop(); //drop
 			if (ec) {
 				if (!_running.load())
 					return;
@@ -43,9 +45,8 @@ namespace MyProxy {
 				destroy();
 				return;
 			}
-			m_writeQueue.pop();
 			if (!m_writeQueue.empty()) {
-				//m_writeStrand.post(std::bind(&AbstractProxySession<boost::asio::ip::udp>::write_impl, this));
+				//m_writeStrand.post(std::bind(&AbstractProxySession<boost::asio::ip::tcp>::write_impl, this));
 				write_impl();
 			}
 		}));

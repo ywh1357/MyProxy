@@ -15,8 +15,7 @@ int main(int argc,char* argv[]) {
 	//auto f = std::make_shared<spdlog::pattern_formatter>("[%D %H:%M:%e]\t[%L]\t[%n]\t%v");
 	//spdlog::set_formatter(f);
 
-	boost::asio::io_service io;
-
+	boost::asio::io_context io;
 	MyProxy::Local::Local local(io);
 
 	std::string caPath;

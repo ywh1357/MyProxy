@@ -142,10 +142,10 @@ namespace MyProxy {
 	class AbstractProxyTunnel : public BasicProxyTunnel, public Botan::TLS::Callbacks {
 	public:
 		enum RunningState : uint8_t { running = 0x00, shutdown_write = 0x01, shutdown_read = 0x02, shutdown_both = 0x03 };
-		//channel: Client or Server, io: io_service
-		AbstractProxyTunnel(boost::asio::io_service &io, std::string loggerName = "AbstractProxyTunnel") :
+		//channel: Client or Server, io: io_context
+		AbstractProxyTunnel(boost::asio::io_context &io, std::string loggerName = "AbstractProxyTunnel") :
 			BasicProxyTunnel(io, loggerName),_writeStrand(io), _strand(io) {}
-		~AbstractProxyTunnel();
+		virtual ~AbstractProxyTunnel();
 		virtual void tls_emit_data(const uint8_t data[], size_t size) override;
 		virtual void tls_record_received(uint64_t seq_no, const uint8_t data[], size_t size) override;
 		virtual void tls_alert(Botan::TLS::Alert alert) override;
@@ -170,9 +170,9 @@ namespace MyProxy {
 		//decrypted data buffer
 		boost::asio::streambuf _readBuffer2;
 		//strand
-		boost::asio::strand _strand;
+		boost::asio::io_context::strand _strand;
 		//channel write strand, different to socket write strand.
-		boost::asio::strand _writeStrand;
+		boost::asio::io_context::strand _writeStrand;
 		//protect channel state
 		std::shared_mutex _stateMutex;
 		//abstract channel

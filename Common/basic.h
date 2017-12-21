@@ -43,7 +43,7 @@ namespace MyProxy {
 		using ssl_socket = boost::asio::ssl::stream<boost::asio::ip::tcp::socket>;
 		std::function<void()> onReady;
 		std::function<void()> onDisconnected;
-		BasicProxyTunnel(boost::asio::io_service &io, std::string loggerName = "Tunnel");
+		BasicProxyTunnel(boost::asio::io_context &io, std::string loggerName = "Tunnel");
 		virtual ~BasicProxyTunnel();
 		virtual void start() = 0;
 		SessionManager& manager() {
@@ -55,7 +55,7 @@ namespace MyProxy {
 		virtual void write(std::shared_ptr<DataVec> dataPtr) = 0;
 		void sessionDestroyNotify(SessionId id);
 	protected:
-		boost::asio::io_service& service() {
+		boost::asio::io_context& service() {
 			return io;
 		}
 		Logger& logger() {
@@ -63,7 +63,7 @@ namespace MyProxy {
 		}
 		void dispatch(std::shared_ptr<SessionPackage> package);
 	private:
-		boost::asio::io_service &io;
+		boost::asio::io_context &io;
 		boost::asio::ip::tcp::socket _connection;
 		SessionManager m_manager;
 		Logger m_logger;
@@ -71,7 +71,7 @@ namespace MyProxy {
 
 	class BasicProxySession {
 	public:
-		BasicProxySession(SessionId id, boost::asio::io_service &io, std::string loggerName = "Session") :
+		BasicProxySession(SessionId id, boost::asio::io_context &io, std::string loggerName = "Session") :
 			m_id(id), io(io) {
 			m_logger = spdlog::get(loggerName);
 			if (!m_logger) {
@@ -100,7 +100,7 @@ namespace MyProxy {
 		//virtual void newPackage(std::shared_ptr<SessionPackage> package) = 0;
 		std::function<void(std::shared_ptr<SessionPackage>)> onReceived = [](std::shared_ptr<SessionPackage>) {};
 	protected:
-		boost::asio::io_service& service() {
+		boost::asio::io_context& service() {
 			return io;
 		}
 		std::shared_ptr<BasicProxyTunnel>& tunnel() { return _tunnel; }
@@ -108,7 +108,7 @@ namespace MyProxy {
 			return m_logger;
 		}
 	private:
-		boost::asio::io_service &io;
+		boost::asio::io_context &io;
 		const SessionId m_id;
 		std::shared_ptr<BasicProxyTunnel> _tunnel;
 		Logger m_logger;

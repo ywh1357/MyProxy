@@ -8,16 +8,16 @@ namespace MyProxy {
 
 		std::shared_mutex ResolveCache::_resolveCacheMutex;
 
-		template<typename Protocol>
-		const typename ResolveCache::CacheRecord<Protocol>::IteratorType ResolveCache::CacheRecord<Protocol>::end = typename Protocol::resolver::iterator();
+		//template<typename Protocol>
+		//const typename ResolveCache::CacheRecord<Protocol>::ResultType ResolveCache::CacheRecord<Protocol>::end = typename Protocol::resolver::iterator();
 
 		//template <typename Protocol>
 		//const typename ResolveCache::CacheMapType<Protocol>::iterator ResolveCache::invalid = typename ResolveCache::CacheMapType<Protocol>::iterator();
 
 		template<typename Protocol>
 		typename ResolveCache::CacheMapType<Protocol> ResolveCache::_resolveCache = typename ResolveCache::CacheMapType<Protocol>(0,
-			std::bind(&ResolveCache::queryHasher<Protocol>, std::placeholders::_1),
-			std::bind(&ResolveCache::queryEqualTo<Protocol>, std::placeholders::_1, std::placeholders::_2)
+			std::bind(&ResolveCache::queryHasher, std::placeholders::_1),
+			std::bind(&ResolveCache::queryEqualTo, std::placeholders::_1, std::placeholders::_2)
 			);
 
 		bool ServerProxyTunnel::tls_session_established(const Botan::TLS::Session & session)
@@ -90,7 +90,7 @@ namespace MyProxy {
 			}
 		}
 
-		Server::Server(boost::asio::io_service &io):m_work(io)
+		Server::Server(boost::asio::io_context &io):_io(io),m_work(io.get_executor())
 		{
 			auto rng = std::make_unique<Botan::AutoSeeded_RNG>();
 			auto mgr = std::make_unique<Botan::TLS::Session_Manager_In_Memory>(*rng);
@@ -125,7 +125,7 @@ namespace MyProxy {
 				bindEp = ip::tcp::endpoint(ip::address::from_string(bindAddress), std::stoi(port));
 			}
 			m_logger->info("Linsten at {}:{}", bindEp.address().to_string(), bindEp.port());
-			m_tcpAcceptor.reset(new ip::tcp::acceptor(m_work.get_io_service(), bindEp));
+			m_tcpAcceptor.reset(new ip::tcp::acceptor(m_work.get_executor().context(), bindEp));
 			m_tcpAcceptor->set_option(ip::tcp::no_delay(true));
 		}
 
@@ -136,7 +136,7 @@ namespace MyProxy {
 
 		void Server::startAccept()
 		{
-			auto tunnel = std::make_shared<ServerProxyTunnel>(*_ctx, m_work.get_io_service());
+			auto tunnel = std::make_shared<ServerProxyTunnel>(*_ctx, _io);
 			//tunnel->onDisconnected = std::bind(&Server::startAccept, this);
 			m_logger->info("Start accept");
 			m_tcpAcceptor->async_accept(tunnel->connection(), [this, tunnel](const boost::system::error_code &ec) {

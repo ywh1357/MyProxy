@@ -45,9 +45,9 @@ namespace MyProxy {
 	{
 		if (!_running.load())
 			return;
-		_strand.post([this, dataPtr, self = shared_from_this()]{
+		post(_strand, [this, dataPtr, self = shared_from_this()]{
 			if (!_channel->is_active())
-				return;
+			return;
 			try {
 				_channel->send(reinterpret_cast<const uint8_t*>(dataPtr->data()), dataPtr->size());
 			}
@@ -63,7 +63,7 @@ namespace MyProxy {
 	{
 		if (!_running.load())
 			return;
-		_strand.post([this, dataPtr = std::move(dataPtr), self = shared_from_this()]{
+		post(_strand, [this, dataPtr = std::move(dataPtr), self = shared_from_this()]{
 			_writeQueue.push(std::move(dataPtr));
 			if (_writeQueue.size() > 1) {
 				return;
@@ -76,23 +76,24 @@ namespace MyProxy {
 	void AbstractProxyTunnel::write_impl()
 	{
 		async_write(connection(), boost::asio::buffer(*_writeQueue.front()), boost::asio::transfer_all(),
-			_strand.wrap([this, self = shared_from_this()](const boost::system::error_code &ec, size_t) {
+			bind_executor(_strand, [this, self = shared_from_this()](const boost::system::error_code &ec, size_t) {
 			_writeQueue.pop(); //drop
-			if (ec) {
-				if (!_running.load())
+				if (ec) {
+					if (!_running.load())
+						return;
+					logger()->debug("AbstractProxyTunnel::write_impl() error: ", ec.message());
+					shutdown(RunningState::shutdown_write);
+					disconnect();
 					return;
-				logger()->debug("AbstractProxyTunnel::write_impl() error: ", ec.message());
-				shutdown(RunningState::shutdown_write);
-				disconnect();
-				return;
-			}
-			if (!_writeQueue.empty()) {
-				write_impl();
-			}
-			else if (!_running.load()) {
-				shutdown(RunningState::shutdown_write);
-			}
-		}));
+				}
+				if (!_writeQueue.empty()) {
+					write_impl();
+				}
+				else if (!_running.load()) {
+					shutdown(RunningState::shutdown_write);
+				}
+			})
+		);
 	}
 	void AbstractProxyTunnel::nextRead()
 	{
@@ -100,27 +101,27 @@ namespace MyProxy {
 		if (!_running.load())
 			return;
 		connection().async_read_some(_readBuffer.prepare(4 * 1024),
-			_strand.wrap([this, self = shared_from_this()](const boost::system::error_code &ec, size_t bytes){
-			if (!_running.load() || _channel->is_closed())
-				return;
-			if (ec) {
-				logger()->debug("AbstractProxyTunnel::nextRead() error: ", ec.message());
-				shutdown(RunningState::shutdown_read);
-				disconnect();
-				return;
-			}
-			try {
-				_channel->received_data(boost::asio::buffer_cast<const uint8_t*>(_readBuffer.data()), bytes);
-			}
-			catch (const std::exception &ex) {
-				logger()->warn("_channel->received_data() error: {}", ex.what());
-				shutdown(RunningState::shutdown_read);
-				_channel->close();
-				disconnect();
-				return;
-			}
-			_readBuffer.consume(bytes);
-			nextRead();
+			bind_executor(_strand, [this, self = shared_from_this()](const boost::system::error_code &ec, size_t bytes){
+				if (!_running.load() || _channel->is_closed())
+					return;
+				if (ec) {
+					logger()->debug("AbstractProxyTunnel::nextRead() error: ", ec.message());
+					shutdown(RunningState::shutdown_read);
+					disconnect();
+					return;
+				}
+				try {
+					_channel->received_data(boost::asio::buffer_cast<const uint8_t*>(_readBuffer.data()), bytes);
+				}
+				catch (const std::exception &ex) {
+					logger()->warn("_channel->received_data() error: {}", ex.what());
+					shutdown(RunningState::shutdown_read);
+					_channel->close();
+					disconnect();
+					return;
+				}
+				_readBuffer.consume(bytes);
+				nextRead();
 			})
 		);
 	}

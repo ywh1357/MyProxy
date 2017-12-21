@@ -50,7 +50,7 @@ namespace MyProxy {
 			}
 		}
 
-		Local::Local(boost::asio::io_service &io): m_work(io), m_resolver(io), m_timer(io)
+		Local::Local(boost::asio::io_service &io): _io(io),m_work(io.get_executor()), m_resolver(io), m_timer(io)
 		{
 			auto rng = std::make_unique<Botan::AutoSeeded_RNG>();
 			auto mgr = std::make_unique<Botan::TLS::Session_Manager_In_Memory>(*rng);
@@ -90,12 +90,12 @@ namespace MyProxy {
 			}
 			m_logger->info("Listen at: {}:{}", bindEp.address().to_string(), bindEp.port());
 			boost::system::error_code ec;
-			m_tcpAcceptor.reset(new ip::tcp::acceptor(m_work.get_io_service(), bindEp));
+			m_tcpAcceptor.reset(new ip::tcp::acceptor(_io, bindEp));
 		}
 
 		void Local::start()
 		{
-			auto tunnel = std::make_shared<LocalProxyTunnel>(*_ctx, m_work.get_io_service());
+			auto tunnel = std::make_shared<LocalProxyTunnel>(*_ctx, _io);
 			tunnel->onDisconnected = [this] {
 				//_tunnelAvailable.store(false);
 				std::unique_lock<std::shared_mutex> locker(tunnelMutex);
@@ -118,7 +118,7 @@ namespace MyProxy {
 
 		void Local::startAccept()
 		{
-			auto session = std::make_shared<LocalProxySession<ip::tcp>>(newSessionId(), m_work.get_io_service());
+			auto session = std::make_shared<LocalProxySession<ip::tcp>>(newSessionId(), _io);
 			m_tcpAcceptor->async_accept(session->socket(), [this, session = session](const boost::system::error_code &ec) {
 				std::shared_lock<std::shared_mutex> locker(tunnelMutex);
 				if (!m_tunnel) {

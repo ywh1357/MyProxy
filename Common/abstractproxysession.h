@@ -11,7 +11,7 @@ namespace MyProxy {
 	{
 	public:
 		struct TraitsProtoType;
-		AbstractProxySession(SessionId id, boost::asio::io_service &io, std::string loggerName = "Session") :
+		AbstractProxySession(SessionId id, boost::asio::io_context &io, std::string loggerName = "Session") :
 			BasicProxySession(id,io, loggerName),
 			m_socket(io), m_writeStrand(io) {}
 		virtual ~AbstractProxySession() {
@@ -37,13 +37,14 @@ namespace MyProxy {
 		void write(std::shared_ptr<DataVec> dataPtr);
 		void write_impl();
 		//Get parent tunnel.
-		std::atomic<bool> _running = false;
+		std::atomic_bool _running = false;
 	private:
 		typename Protocol::socket m_socket;
-		boost::asio::strand m_writeStrand;
+		boost::asio::io_context::strand m_writeStrand;
 		std::queue<std::shared_ptr<DataVec>> m_writeQueue;
 		//std::array<char,1024> m_readBuffer;
 		boost::asio::streambuf m_readBuffer2;
+		std::atomic_bool _stopped = false;
 	};
 
 	template<>
@@ -58,14 +59,22 @@ namespace MyProxy {
 	template<typename Protocol>
 	inline void AbstractProxySession<Protocol>::stop()
 	{
+		if (_stopped.exchange(true)) {
+			return;
+		}
 		auto self = this->shared_from_this();
 		if (m_socket.is_open()) {
 			boost::system::error_code ec;
+			m_socket.cancel(ec);
+			if (ec) {
+				logger()->debug("ID: {} Cancle error: {}", id(), ec.message());
+				ec.clear();
+			}
 			m_socket.shutdown(m_socket.shutdown_both, ec);
 			if (ec) {
 				logger()->debug("ID: {} Shutdown error: {}",id(), ec.message());
+				ec.clear();
 			}
-			ec.clear();
 			m_socket.close(ec);
 			if (ec) {
 				logger()->debug("ID: {} Close error: {}",id(), ec.message());
@@ -114,7 +123,7 @@ namespace MyProxy {
 			auto data = buffer_cast<const char*>(m_readBuffer2.data());
 			SessionPackage package{ id(),DataVec{ data, data + bytes } };
 			auto dp = std::make_shared<DataVec>(package.toDataVec());
-			tunnel()->write(std::move(dp));
+			tunnel()->write(dp);
 			m_readBuffer2.consume(bytes);
 			startForwarding_impl();
 		});
@@ -124,7 +133,7 @@ namespace MyProxy {
 	inline void AbstractProxySession<Protocol>::write(std::shared_ptr<DataVec> dataPtr)
 	{
 		//logger()->trace("AbstractProxySession<Protocol>::write() {} bytes write method posted", dataPtr->size());
-		m_writeStrand.post([this, dataPtr = std::move(dataPtr), self = this->shared_from_this()]{
+		post(m_writeStrand, [this, dataPtr = std::move(dataPtr), self = this->shared_from_this()]{
 			if (!_running.load())
 				return;
 			//logger()->trace("AbstractProxySession<Protocol>::write() -> Lambda: {} bytes push to m_writeQueue", dataPtr->size());
