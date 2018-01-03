@@ -248,7 +248,7 @@ namespace MyProxy {
 			void start();
 		private:
 			void startAccept();
-			void startConnect(std::shared_ptr<LocalProxyTunnel> tunnel, boost::asio::ip::tcp::resolver::iterator it);
+			void startConnect(std::shared_ptr<LocalProxyTunnel> tunnel, boost::asio::ip::tcp::resolver::results_type result);
 			SessionId newSessionId();
 		private:
 			boost::asio::io_context &_io;

@@ -5,7 +5,6 @@
 #include "define.h"
 #include "packages.h"
 #include <boost/asio.hpp>
-#include <boost/asio/ssl.hpp>
 #include <tuple>
 #include <queue>
 #include <vector>
@@ -40,7 +39,6 @@ namespace MyProxy {
 
 	class BasicProxyTunnel : public std::enable_shared_from_this<BasicProxyTunnel> {
 	public:
-		using ssl_socket = boost::asio::ssl::stream<boost::asio::ip::tcp::socket>;
 		std::function<void()> onReady;
 		std::function<void()> onDisconnected;
 		BasicProxyTunnel(boost::asio::io_context &io, std::string loggerName = "Tunnel");

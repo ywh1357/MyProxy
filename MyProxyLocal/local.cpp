@@ -50,7 +50,7 @@ namespace MyProxy {
 			}
 		}
 
-		Local::Local(boost::asio::io_service &io): _io(io),m_work(io.get_executor()), m_resolver(io), m_timer(io)
+		Local::Local(boost::asio::io_context &io): _io(io),m_work(io.get_executor()), m_resolver(io), m_timer(io)
 		{
 			auto rng = std::make_unique<Botan::AutoSeeded_RNG>();
 			auto mgr = std::make_unique<Botan::TLS::Session_Manager_In_Memory>(*rng);
@@ -105,14 +105,14 @@ namespace MyProxy {
 				start();
 			};
 			//locker.unlock();
-			auto query = std::make_shared<ip::tcp::resolver::query>(m_serverHost, m_serverPort);
-			m_resolver.async_resolve(*query, [this, tunnel, query](const boost::system::error_code &ec, ip::tcp::resolver::iterator it) {
+			m_resolver.async_resolve(m_serverHost, m_serverPort, [this, tunnel](const boost::system::error_code &ec, ip::tcp::resolver::results_type result) {
 				if (ec) {
 					m_logger->error("Resolve failed: {}", ec.message());
 					//retry?
 					return;
 				}
-				startConnect(tunnel, it);
+				m_logger->info("{} resolved to {}", m_serverHost,(*result).endpoint().address().to_string());
+				startConnect(tunnel, result);
 			});
 		}
 
@@ -137,23 +137,23 @@ namespace MyProxy {
 			});
 		}
 
-		void Local::startConnect(std::shared_ptr<LocalProxyTunnel> tunnel, ip::tcp::resolver::iterator it)
+		void Local::startConnect(std::shared_ptr<LocalProxyTunnel> tunnel, ip::tcp::resolver::results_type result)
 		{
-			async_connect(tunnel->connection(), it, [this, tunnel, it](const boost::system::error_code &ec, ip::tcp::resolver::iterator last) {
+			async_connect(tunnel->connection(), result, [this, tunnel, result](const boost::system::error_code &ec, ip::tcp::endpoint ep) {
 				if (ec) {
 					m_logger->error("Connectd failed: {}", ec.message());
 					m_timer.expires_from_now(boost::posix_time::seconds(5));
-					m_timer.async_wait([this, tunnel, it = std::move(it)](const boost::system::error_code &ec) {
+					m_timer.async_wait([this, tunnel, result](const boost::system::error_code &ec) {
 						if (ec) {
 							m_logger->warn("Timer error: {}",ec.message());
 							return;
 						}
-						startConnect(tunnel, std::move(it));
+						startConnect(tunnel, result);
 					});
 					return;
 				}
 				tunnel->connection().set_option(ip::tcp::no_delay(true));
-				auto ep = (*last).endpoint();
+				//auto ep = (*result).endpoint();
 				m_logger->info("Connectd to server: {}:{}", ep.address().to_string(), ep.port());
 				std::unique_lock<std::shared_mutex> locker(tunnelMutex);
 				m_tunnel = tunnel;
