@@ -52,7 +52,7 @@ namespace MyProxy {
 			}
 			//fetch record's shared_ptr, if not found, return invalid shared_ptr
 			template<typename Protocol>
-			static std::shared_ptr<CacheRecord<Protocol>> fetch(const Destination &dest) {
+			static std::shared_ptr<CacheRecord<Protocol>> fetch(const ResolveCache::Destination &dest) {
 				//read lock
 				std::shared_lock<std::shared_mutex> locker(_resolveCacheMutex);
 				auto iter = _resolveCache<Protocol>.find(dest);
@@ -62,10 +62,10 @@ namespace MyProxy {
 					return std::shared_ptr<CacheRecord<Protocol>>();
 			}
 		private:
-			static bool queryEqualTo(const Destination & l, const typename Destination & r) {
+			static bool queryEqualTo(const ResolveCache::Destination & l, const typename ResolveCache::Destination & r) {
 				return l.host == r.host && l.service == r.service;
 			}
-			static size_t queryHasher(const Destination & q) {
+			static size_t queryHasher(const ResolveCache::Destination & q) {
 				auto h1 = std::hash<std::string>{}(q.host);
 				auto h2 = std::hash<std::string>{}(q.service);
 				return h1 ^ (h2 << 1);

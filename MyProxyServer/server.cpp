@@ -36,7 +36,7 @@ namespace MyProxy {
 			);
 			if (!result.successful_validation()) {
 				channel()->send_fatal_alert(Botan::TLS::Alert::BAD_CERTIFICATE);
-				throw std::exception(result.result_string().c_str());
+				throw std::invalid_argument(result.result_string().c_str());
 			}
 			return true;
 		}

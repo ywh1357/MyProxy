@@ -136,7 +136,7 @@ namespace MyProxy {
 	void AbstractProxyTunnel::shutdown(RunningState state)
 	{
 		using shutdown_type = boost::asio::socket_base::shutdown_type;
-		auto op = state & ~RunningState(std::atomic_fetch_or(&_state, state));
+		auto op = state & ~RunningState(std::atomic_fetch_or(&_state, static_cast<uint8_t>(state)));
 		boost::system::error_code ec;
 		if (op & RunningState::shutdown_read) {
 			ec.clear();
